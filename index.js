@@ -776,6 +776,21 @@ setInterval(() => {
     writeDB(db);
 }, 60 * 1000);
 
+
+const http = require('http');
+
+// Минимальный HTTP-сервер для Render
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Бот "Античный Градоначальник" работает! 🏛️');
+});
+
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+    console.log(`✅ HTTP-сервер запущен на порту ${PORT}`);
+});
+
+
 // ===== ЗАПУСК =====
 bot.launch()
     .then(() => console.log('🚀 Бот "Античный Градоначальник" запущен!'))
