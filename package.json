@@ -1,0 +1,14 @@
+{
+  "name": "antichniy-grad",
+  "version": "1.0.0",
+  "description": "🏛️ Экономическая стратегия в Telegram",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "node-cron": "^3.0.3",
+    "telegraf": "^4.16.3"
+  }
+}
