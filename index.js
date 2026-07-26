@@ -213,11 +213,11 @@ bot.start(async (ctx) => {
     // Рефералка
     if (text.includes('ref_')) {
         const refId = text.split('_')[1];
-        if (refId == userId) return ctx.reply('❌ Нельзя пригласить самого себя!');
+        if (refId == userId) return await ctx.reply('❌ Нельзя пригласить самого себя!');
 
-        const db = readDB();
+        const db = await readDB();
         const newUser = db.users[userId];
-        if (newUser.referredBy) return ctx.reply('❌ Ты уже был приглашён!');
+        if (newUser.referredBy) return await ctx.reply('❌ Ты уже был приглашён!');
 
         newUser.referredBy = refId;
         newUser.gold += 200;
@@ -237,7 +237,7 @@ bot.start(async (ctx) => {
 
     const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
     user.level = totalBuildings + 1;
-    saveUser(userId, user);
+    await saveUser(userId, user);
 
     await ctx.reply(
         `🏛️ ДОБРО ПОЖАЛОВАТЬ, ГРАДОНАЧАЛЬНИК!\n\n` +
