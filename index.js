@@ -514,7 +514,7 @@ bot.action('boss_personal', async (ctx) => {
     }
 
     const soldiers = getSoldiers(user);
-    const damage = soldiers * 5;
+    const damage = soldiers * 3;
     personal.hp -= damage;
 
     if (personal.hp <= 0) {
@@ -550,7 +550,7 @@ bot.action('boss_global', async (ctx) => {
     }
 
     const soldiers = getSoldiers(user);
-    const damage = soldiers * 5;
+    const damage = soldiers * 3;
     global.hp -= damage;
 
     if (!global.participants) global.participants = [];
