@@ -261,7 +261,7 @@ bot.start(async (ctx) => {
     saveUser(userId, user);
 
     await ctx.reply(
-        `🏛️ ДОБРО ПОЖАЛОВАТЬ, ГРАДОНАЧАЛЬНИК!\n\n` +
+        `🏛️ ДОБРО ПОЖАЛОВАТЬ,${isAdmin(ctx.from.id)? "РАЗРАБОТЧИК":"ГРАДОГАЧАЛЬНИК"}` +
         `💰 Золото: ${user.gold}\n` +
         `🏗️ Уровень города: ${user.level}\n` +
         `👥 Друзей: ${user.referrals ? user.referrals.length : 0}\n\n` +
