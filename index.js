@@ -14,12 +14,10 @@ if (!BOT_TOKEN) {
 const bot = new Telegraf(BOT_TOKEN);
 const DB_FILE = 'database.json';
 
-// ===== ПРОВЕРКА АДМИНА =====
-function isAdmin(userId) {
-    return ADMINS.includes(userId.toString());
-}
+// ============================================================
+// 1. ХРАНИЛИЩЕ (БАЗА ДАННЫХ)
+// ============================================================
 
-// ===== ХРАНИЛИЩЕ =====
 function readDB() {
     try {
         if (!fs.existsSync(DB_FILE)) {
@@ -95,41 +93,59 @@ function saveUser(id, data) {
     writeDB(db);
 }
 
-// ===== КОНСТАНТЫ =====
-const BUILDING_COSTS = {
-    hut: 20,
-    farm: 10,
-    mine: 30,
-    mint: 70,
-    market: 200,
-    barracks: 50
-};
+function isAdmin(userId) {
+    return ADMINS.includes(userId.toString());
+}
 
-const BUILDING_NAMES = {
-    hut: '🏠 Хижина',
-    farm: '🌾 Ферма',
-    mine: '⛏️ Шахта',
-    mint: '🪙 Монетный двор',
-    market: '🏪 Рынок',
-    barracks: '🪖 Казарма'
-};
+// ============================================================
+// 2. КОНСТАНТЫ
+// ============================================================
 
-const MAIN_MENU = {
-    reply_markup: {
-        keyboard: [
-            ['ℹ️ О боте'],
-            ['🏙️ Город', '👥 Пригласить друга'],
-            ['🎁 Ежедневный бонус'],
-            ['🛒 Магазин', '⚔️ Босс'],
-            ['🏆 Олимп', '🪖 Казармы']
-        ],
-        resize_keyboard: true
+const CONFIG = {
+    BUILDING_COSTS: {
+        hut: 20,
+        farm: 10,
+        mine: 30,
+        mint: 70,
+        market: 200,
+        barracks: 50
+    },
+    BUILDING_NAMES: {
+        hut: '🏠 Хижина',
+        farm: '🌾 Ферма',
+        mine: '⛏️ Шахта',
+        mint: '🪙 Монетный двор',
+        market: '🏪 Рынок',
+        barracks: '🪖 Казарма'
+    },
+    INCOME_INTERVALS: {
+        regular: 5 * 60 * 1000, // 5 минут
+        vip: 3 * 60 * 1000      // 3 минуты
+    },
+    MAIN_MENU: {
+        reply_markup: {
+            keyboard: [
+                ['ℹ️ О боте'],
+                ['🏙️ Город', '👥 Пригласить друга'],
+                ['🎁 Ежедневный бонус'],
+                ['🛒 Магазин', '⚔️ Босс'],
+                ['🏆 Олимп', '🪖 Казармы']
+            ],
+            resize_keyboard: true
+        }
     }
 };
 
-// ===== ХЕЛПЕРЫ =====
+// ============================================================
+// 3. ХЕЛПЕРЫ
+// ============================================================
+
 function isVIP(user) {
     return user.vip && user.vip.active && user.vip.expiresAt > Date.now();
+}
+
+function getIncomeInterval(user) {
+    return isVIP(user) ? CONFIG.INCOME_INTERVALS.vip : CONFIG.INCOME_INTERVALS.regular;
 }
 
 function getSoldiers(user) {
@@ -169,7 +185,10 @@ function calculateIncome(user) {
     return { gold, food, coins };
 }
 
-// ===== ПОКАЗ ГОРОДА =====
+// ============================================================
+// 4. ПОКАЗ ГОРОДА
+// ============================================================
+
 async function showCity(ctx) {
     const user = getUser(ctx.from.id);
     const income = calculateIncome(user);
@@ -202,7 +221,10 @@ async function showCity(ctx) {
     );
 }
 
-// ===== КОМАНДЫ =====
+// ============================================================
+// 5. КОМАНДА /start
+// ============================================================
+
 bot.start(async (ctx) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
@@ -210,12 +232,11 @@ bot.start(async (ctx) => {
     user.username = ctx.from.username || ctx.from.first_name || 'unknown';
     saveUser(userId, user);
 
-    // Рефералка
     if (text.includes('ref_')) {
         const refId = text.split('_')[1];
         if (refId == userId) return await ctx.reply('❌ Нельзя пригласить самого себя!');
 
-        const db = await readDB();
+        const db = readDB();
         const newUser = db.users[userId];
         if (newUser.referredBy) return await ctx.reply('❌ Ты уже был приглашён!');
 
@@ -237,7 +258,7 @@ bot.start(async (ctx) => {
 
     const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
     user.level = totalBuildings + 1;
-    await saveUser(userId, user);
+    saveUser(userId, user);
 
     await ctx.reply(
         `🏛️ ДОБРО ПОЖАЛОВАТЬ, ГРАДОНАЧАЛЬНИК!\n\n` +
@@ -245,11 +266,14 @@ bot.start(async (ctx) => {
         `🏗️ Уровень города: ${user.level}\n` +
         `👥 Друзей: ${user.referrals ? user.referrals.length : 0}\n\n` +
         `Строй, воюй и приводи друзей!`,
-        MAIN_MENU
+        CONFIG.MAIN_MENU
     );
 });
 
-// ===== КНОПКИ (HEARS) =====
+// ============================================================
+// 6. КНОПКИ (HEARS)
+// ============================================================
+
 bot.hears('ℹ️ О боте', async (ctx) => {
     await ctx.reply(
         `🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n` +
@@ -257,7 +281,7 @@ bot.hears('ℹ️ О боте', async (ctx) => {
         `Разработчик: @${ctx.botInfo.username}\n\n` +
         `📖 Экономическая стратегия в Telegram.\n` +
         `Строй город, добывай ресурсы, сражайся с боссами и приводи друзей!`,
-        MAIN_MENU
+        CONFIG.MAIN_MENU
     );
 });
 
@@ -400,14 +424,16 @@ bot.hears('🏆 Олимп', async (ctx) => {
         text += `${medal} @${user.username || 'unknown'} — 💰${user.gold}\n`;
     });
 
-    await ctx.reply(text, MAIN_MENU);
+    await ctx.reply(text, CONFIG.MAIN_MENU);
 });
 
-// ===== КОЛБЭКИ (CALLBACK) =====
+// ============================================================
+// 7. КОЛБЭКИ (CALLBACK)
+// ============================================================
+
 bot.action('back_to_menu', async (ctx) => {
     await ctx.answerCbQuery();
-    const user = getUser(ctx.from.id);
-    await ctx.reply(`🏛️ Главное меню`, MAIN_MENU);
+    await ctx.reply(`🏛️ Главное меню`, CONFIG.MAIN_MENU);
 });
 
 bot.action('back_to_city', showCity);
@@ -415,11 +441,11 @@ bot.action('back_to_city', showCity);
 bot.action('build_menu', async (ctx) => {
     const user = getUser(ctx.from.id);
     let menu = `🏗️ СТРОИТЕЛЬСТВО\n💰 Золото: ${user.gold}\n\n`;
-    for (const [key, cost] of Object.entries(BUILDING_COSTS)) {
-        menu += `${BUILDING_NAMES[key]} — ${cost}💰\n`;
+    for (const [key, cost] of Object.entries(CONFIG.BUILDING_COSTS)) {
+        menu += `${CONFIG.BUILDING_NAMES[key]} — ${cost}💰\n`;
     }
-    const buttons = Object.keys(BUILDING_COSTS).map(key => [
-        { text: `${BUILDING_NAMES[key]} (${BUILDING_COSTS[key]}💰)`, callback_data: `build_${key}` }
+    const buttons = Object.keys(CONFIG.BUILDING_COSTS).map(key => [
+        { text: `${CONFIG.BUILDING_NAMES[key]} (${CONFIG.BUILDING_COSTS[key]}💰)`, callback_data: `build_${key}` }
     ]);
     buttons.push([{ text: '🔙 Назад', callback_data: 'back_to_city' }]);
 
@@ -430,7 +456,7 @@ bot.action(/^build_(.+)/, async (ctx) => {
     const userId = ctx.from.id;
     const type = ctx.match[1];
     const user = getUser(userId);
-    const cost = BUILDING_COSTS[type];
+    const cost = CONFIG.BUILDING_COSTS[type];
 
     if (user.gold < cost) {
         return ctx.reply(`❌ Не хватает золота! Нужно ${cost}, у тебя ${user.gold}`);
@@ -443,7 +469,6 @@ bot.action(/^build_(.+)/, async (ctx) => {
     const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
     user.level = totalBuildings + 1;
 
-    // Рефералка: 5 уровень → VIP
     if (user.level >= 5 && user.referredBy && !user.referralCompleted) {
         user.referralCompleted = true;
         const db = readDB();
@@ -459,7 +484,7 @@ bot.action(/^build_(.+)/, async (ctx) => {
     }
 
     saveUser(userId, user);
-    await ctx.reply(`✅ ${BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`);
+    await ctx.reply(`✅ ${CONFIG.BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`);
     await showCity(ctx);
 });
 
@@ -467,7 +492,7 @@ bot.action('collect_income', async (ctx) => {
     const userId = ctx.from.id;
     const user = getUser(userId);
     const now = Date.now();
-    const interval = isVIP(user) ? 15 * 60 * 1000 : 30 * 60 * 1000;
+    const interval = getIncomeInterval(user);
     const elapsed = now - user.lastIncome;
 
     if (elapsed < interval) {
@@ -611,11 +636,12 @@ bot.action('build_barracks', async (ctx) => {
     await ctx.reply(`🪖 Казарма построена! Солдат: ${getSoldiers(user)}`);
 });
 
-// ===== АДМИН-КОМАНДЫ (ПРОВЕРКА ЧЕРЕЗ isAdmin) =====
+// ============================================================
+// 8. АДМИН-КОМАНДЫ
+// ============================================================
+
 bot.command('admin', async (ctx) => {
-    if (!isAdmin(ctx.from.id)) {
-        return ctx.reply('⛔ Доступ запрещён.');
-    }
+    if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Доступ запрещён.');
     await ctx.reply(
         `👑 АДМИН-ПАНЕЛЬ\n\n` +
         `📌 Команды:\n` +
@@ -625,7 +651,7 @@ bot.command('admin', async (ctx) => {
         `/list_users\n` +
         `/delete_user @user\n` +
         `/reset_user @user`,
-        MAIN_MENU
+        CONFIG.MAIN_MENU
     );
 });
 
@@ -749,7 +775,10 @@ bot.command('reset_user', async (ctx) => {
     await ctx.reply(`✅ ${username} сброшен до начального состояния`);
 });
 
-// ===== ГЛОБАЛЬНЫЙ БОСС (РАСПИСАНИЕ) =====
+// ============================================================
+// 9. ГЛОБАЛЬНЫЙ БОСС (РАСПИСАНИЕ)
+// ============================================================
+
 cron.schedule('0 12,18 * * *', () => {
     const db = readDB();
     const userCount = Object.keys(db.users).length;
@@ -764,7 +793,10 @@ cron.schedule('0 12,18 * * *', () => {
     console.log(`🌍 Глобальный босс появился! HP: ${hp}`);
 });
 
-// ===== АВТООБНОВЛЕНИЕ VIP =====
+// ============================================================
+// 10. АВТООБНОВЛЕНИЕ VIP
+// ============================================================
+
 setInterval(() => {
     const db = readDB();
     for (const id in db.users) {
@@ -776,10 +808,11 @@ setInterval(() => {
     writeDB(db);
 }, 60 * 1000);
 
+// ============================================================
+// 11. HTTP-СЕРВЕР ДЛЯ RENDER
+// ============================================================
 
 const http = require('http');
-
-// Минимальный HTTP-сервер для Render
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Бот "Античный Градоначальник" работает! 🏛️');
@@ -790,8 +823,10 @@ server.listen(PORT, () => {
     console.log(`✅ HTTP-сервер запущен на порту ${PORT}`);
 });
 
+// ============================================================
+// 12. ЗАПУСК
+// ============================================================
 
-// ===== ЗАПУСК =====
 bot.launch()
     .then(() => console.log('🚀 Бот "Античный Градоначальник" запущен!'))
     .catch(err => console.error('❌ Ошибка:', err));
