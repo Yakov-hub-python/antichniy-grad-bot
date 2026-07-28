@@ -1,0 +1,112 @@
+const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
+const { getSoldiers, getPersonalBossHP, getBossReward } = require('../utils/helpers');
+
+module.exports = {
+    attackPersonal: async (ctx) => {
+        const userId = ctx.from.id;
+        const user = getUser(userId);
+        const personal = user.personalBoss || { hp: 5000, maxHp: 5000, respawnAt: 0, kills: 0 };
+
+        if (personal.respawnAt > Date.now()) {
+            const left = Math.floor((personal.respawnAt - Date.now()) / 60000);
+            return ctx.reply(`⏳ Личный босс перерождается через ${left} минут`);
+        }
+
+        const soldiers = getSoldiers(user);
+        const damage = soldiers * 5;
+        personal.hp -= damage;
+
+        if (personal.hp <= 0) {
+            personal.hp = getPersonalBossHP(user);
+            personal.respawnAt = Date.now() + 6 * 60 * 60 * 1000;
+            personal.kills = (personal.kills || 0) + 1;
+
+            const reward = getBossReward(user);
+            user.gold += reward;
+            user.bossKills = (user.bossKills || 0) + 1;
+
+            if (Math.random() < 0.1) {
+                user.vip = { active: true, expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
+                await ctx.reply(`🎉 Ты получил VIP на 1 день за убийство личного босса!`);
+            }
+
+            user.personalBoss = personal;
+            saveUser(userId, user);
+
+            await ctx.reply(
+                `⚔️ ЛИЧНЫЙ БОСС ПОВЕРЖЕН!\n` +
+                `💰 +${reward} золота!\n` +
+                `🏆 Убийств: ${personal.kills}\n` +
+                `⏳ Следующий через 6 часов.`
+            );
+        } else {
+            user.personalBoss = personal;
+            saveUser(userId, user);
+
+            await ctx.reply(
+                `⚔️ Урон: ${damage}. Осталось HP: ${personal.hp}/${getPersonalBossHP(user)}`
+            );
+        }
+    },
+
+    attackGlobal: async (ctx) => {
+        const userId = ctx.from.id;
+        const user = getUser(userId);
+        const db = readDB();
+        const global = db.globalBoss || { hp: 5000, maxHp: 5000, active: true, participants: [] };
+
+        if (!global.active) {
+            return ctx.reply('💤 Глобальный босс повержен. Следующий в 12:00 или 18:00.');
+        }
+
+        const soldiers = getSoldiers(user);
+        const damage = soldiers * 5;
+        global.hp -= damage;
+
+        if (!global.participants) global.participants = [];
+        const existing = global.participants.find(p => p.id === userId);
+        if (existing) {
+            existing.damage += damage;
+        } else {
+            global.participants.push({ id: userId, damage: damage });
+        }
+
+        if (global.hp <= 0) {
+            global.active = false;
+            const sorted = global.participants.sort((a, b) => b.damage - a.damage);
+            const top = sorted.slice(0, 3);
+
+            for (let i = 0; i < top.length; i++) {
+                const player = getUser(top[i].id);
+                if (i === 0) {
+                    player.vip = { active: true, expiresAt: Date.now() + 15 * 24 * 60 * 60 * 1000 };
+                    await ctx.telegram.sendMessage(top[i].id, '🏆 Ты занял 1 место! Получил VIP на 15 дней!');
+                } else {
+                    player.gold += 50;
+                    await ctx.telegram.sendMessage(top[i].id, `🥈 ${i+1} место! +50 золота!`);
+                }
+                saveUser(top[i].id, player);
+            }
+
+            const share = Math.floor(5000 / (global.participants.length || 1));
+            for (const p of global.participants) {
+                const player = getUser(p.id);
+                player.gold += share;
+                saveUser(p.id, player);
+            }
+
+            const userCount = Object.keys(db.users).length;
+            global.hp = 1000 * Math.floor(userCount / 2) || 5000;
+            global.maxHp = global.hp;
+            global.participants = [];
+            db.globalBoss = global;
+            writeDB(db);
+
+            await ctx.reply(`🌍 ГЛОБАЛЬНЫЙ БОСС ПОВЕРЖЕН!\n💰 Все участники получили +${share} золота!`);
+        } else {
+            db.globalBoss = global;
+            writeDB(db);
+            await ctx.reply(`⚔️ Урон: ${damage}. Осталось HP: ${global.hp}/${global.maxHp}`);
+        }
+    }
+};
