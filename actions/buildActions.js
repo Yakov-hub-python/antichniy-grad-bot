@@ -1,5 +1,6 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { BUILDING_COSTS, BUILDING_NAMES } = require('../config/constants');
+const city = require('../hears/city');
 
 module.exports = {
     build: async (ctx) => {
@@ -35,6 +36,6 @@ module.exports = {
 
         saveUser(userId, user);
         await ctx.reply(`✅ ${BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`);
-        await showCity(ctx);
+        await city.show(ctx);
     }
 };
