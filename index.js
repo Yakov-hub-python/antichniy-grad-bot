@@ -55,7 +55,6 @@ server.listen(PORT, () => console.log(`✅ HTTP-сервер запущен на
 
 // ===== ЗАПУСК =====
 bot.launch()
-    .then(() => console.log('🚀 Бот "Античный Градоначальник" запущен!'))
     .catch(err => console.error('❌ Ошибка:', err));
 
 process.once('SIGINT', () => { bot.stop('SIGINT'); server.close(); });

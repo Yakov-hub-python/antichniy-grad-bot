@@ -1,11 +1,13 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { MAIN_MENU } = require('../config/constants');
 const { getSoldiers } = require('../utils/helpers');
+const fs = require('fs');
+
 
 // ===== ПРОВЕРКА АДМИНА =====
 function isAdmin(userId) {
-    const ADMINS = process.env.ADMINS ? process.env.ADMINS.split(',').map(id => id.trim()) : [];
-    return ADMINS.includes(userId.toString());
+    const ADMIN = process.env.ADMIN ? process.env.ADMIN.split(',').map(id => id.trim()) : [];
+    return ADMIN.includes(userId.toString());
 }
 
 module.exports = (bot) => {
@@ -58,10 +60,6 @@ module.exports = (bot) => {
             }
         );
     });
-
-
-
-    
     // ===== /HELP =====
     bot.command('help', async (ctx) => {
         await ctx.reply(
@@ -328,15 +326,35 @@ module.exports = (bot) => {
         try {
             const db = readDB();
             const json = JSON.stringify(db, null, 2);
+            const filename = `backup_${new Date().toISOString().slice(0,10)}.json`
             await ctx.replyWithDocument({
                 source: Buffer.from(json, 'utf-8'),
-                filename: `backup_${new Date().toISOString().slice(0,10)}.json`
+                filename: filename
             });
             await ctx.reply(`✅ Бекап создан!`);
+            await ctx.reply(`Чтобы его применить введите команду /restore ${filename}`)
         } catch (err) {
             console.error('❌ Ошибка бекапа:', err.message);
             await ctx.reply('❌ Ошибка при создании бекапа');
         }
     });
-
+    // ===== /RESTORE =====
+    bot.command('restore', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Доступ запрещён.');
+        
+        const args = ctx.message.text.split(' ');
+        if (args.length < 2) {
+            return ctx.reply('❌ Используй: /restore { Имя файла }');
+        }
+        
+        const filename = args[1];
+        try {
+            const data = fs.readFileSync(filename, 'utf-8');
+            const db = JSON.parse(data);
+            writeDB(db);
+            await ctx.reply(`✅ Бекап ${filename} восстановлен!`);
+        } catch (err) {
+            await ctx.reply(`❌ Не удалось восстановить ${filename}: ${err.message}`);
+        }
+    })
 };

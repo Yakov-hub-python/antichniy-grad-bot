@@ -1,5 +1,5 @@
 const { getUser, saveUser } = require('../utils/storage');
-const { calculateIncome, getIncomeInterval, isVIP } = require('../utils/helpers');
+const { calculateIncome, getIncomeInterval, isVIP,getTodayBonus,generateDailyBonus } = require('../utils/helpers');
 
 module.exports = {
     collect: async (ctx) => {
@@ -21,13 +21,12 @@ module.exports = {
         if (income.gold === 0 && income.food === 0 && income.coins === 0) {
             return ctx.reply('🏗️ Нет зданий — нет дохода. Построй шахты, фермы или монетный двор!');
         }
-
+        
         user.gold += income.gold;
         user.food += income.food;
         user.coins = (user.coins || 0) + income.coins;
         user.lastIncome = now;
         saveUser(userId, user);
-
         await ctx.reply(
             `💰 СОБРАН ДОХОД!\n` +
             `💰 +${income.gold} золота\n` +
