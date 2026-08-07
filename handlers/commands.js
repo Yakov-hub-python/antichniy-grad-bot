@@ -2,12 +2,21 @@ const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { MAIN_MENU } = require('../config/constants');
 const { getSoldiers } = require('../utils/helpers');
 const fs = require('fs');
+const path = require('path');
 
-
-// ===== ПРОВЕРКА АДМИНА =====
+// ===== ПРОВЕРКА АДМИНА С ЛОГИРОВАНИЕМ =====
 function isAdmin(userId) {
-    const ADMIN = process.env.ADMIN ? process.env.ADMIN.split(',').map(id => id.trim()) : [];
-    return ADMIN.includes(userId.toString());
+    const adminsRaw = process.env.ADMINS || process.env.ADMIN || '';
+    const admins = adminsRaw.split(',').map(id => id.trim()).filter(id => id.length > 0);
+    const result = admins.includes(userId.toString());
+    
+    console.log(
+        `🔍 [ADMIN CHECK] ID: ${userId} | ` +
+        `Список: [${admins.join(', ') || 'пусто'}] | ` +
+        `Результат: ${result ? '✅ ДОСТУП РАЗРЕШЁН' : '⛔ ДОСТУП ЗАПРЕЩЁН'}`
+    );
+    
+    return result;
 }
 
 module.exports = (bot) => {
@@ -151,9 +160,19 @@ module.exports = (bot) => {
             `👥 Друзей: ${user.referrals?.length || 0}`
         );
     });
+
+    // ============================================
+    // ========== АДМИН-КОМАНДЫ ==========
+    // ============================================
+
     // ===== /ADMIN =====
     bot.command('admin', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Доступ запрещён.');
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [ADMIN] Доступ запрещен для ${ctx.from.id}`);
+            return ctx.reply('⛔ Доступ запрещён.');
+        }
+        
+        console.log(`👑 [ADMIN] Панель открыта для ${ctx.from.id}`);
         await ctx.reply(
             `👑 АДМИН-ПАНЕЛЬ\n\n` +
             `📌 Команды:\n` +
@@ -164,13 +183,20 @@ module.exports = (bot) => {
             `/list_users\n` +
             `/delete_user @user\n` +
             `/reset_user @user\n` +
-            `/backup — скачать бекап БД`,
+            `/backup — скачать бекап БД\n` +
+            `/restore — восстановить БД (ответом на бекап)`,
             MAIN_MENU
         );
     });
+
     // ===== /STATS — СТАТИСТИКА БОТА =====
     bot.command('stats', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Доступ запрещён.');
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [STATS] Доступ запрещен для ${ctx.from.id}`);
+            return ctx.reply('⛔ Доступ запрещён.');
+        }
+        
+        console.log(`📊 [STATS] Запрос статистики от ${ctx.from.id}`);
         
         const db = readDB();
         const users = Object.values(db.users);
@@ -192,110 +218,212 @@ module.exports = (bot) => {
             `📈 Средний баланс: ${avgGold}\n` +
             `👑 VIP-игроков: ${vipCount}\n` +
             `👥 Всего жителей: ${totalCitizens}\n` +
-            `🪖 Всего солдат: ${totalSoldiers}\n` +
-            `🏗️ Активных игроков: ???`
+            `🪖 Всего солдат: ${totalSoldiers}`
         );
     });
+
     // ===== /GIVE_GOLD =====
     bot.command('give_gold', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return;
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [GIVE_GOLD] Доступ запрещен для ${ctx.from.id}`);
+            return;
+        }
+        
         const args = ctx.message.text.split(' ');
-        if (args.length < 3) return ctx.reply('❌ /give_gold @user 100');
+        if (args.length < 3) {
+            return ctx.reply('❌ Используйте: /give_gold @user 100');
+        }
+        
         const username = args[1].replace('@', '');
         const amount = parseInt(args[2]);
+        if (isNaN(amount) || amount <= 0) {
+            return ctx.reply('❌ Укажите положительное число.');
+        }
+        
         const db = readDB();
         let found = false;
+        let userId = null;
+        
         for (const id in db.users) {
             if (db.users[id].username === username) {
                 db.users[id].gold += amount;
+                userId = id;
                 found = true;
                 break;
             }
         }
-        if (!found) return ctx.reply('❌ Игрок не найден');
+        
+        if (!found) {
+            console.log(`❌ [GIVE_GOLD] Игрок @${username} не найден`);
+            return ctx.reply(`❌ Игрок @${username} не найден`);
+        }
+        
         writeDB(db);
-        await ctx.reply(`✅ ${username} получил ${amount} золота`);
+        console.log(`✅ [GIVE_GOLD] @${username} (${userId}) получил ${amount} золота от ${ctx.from.id}`);
+        await ctx.reply(`✅ @${username} получил ${amount} золота`);
     });
 
     // ===== /GIVE_VIP =====
     bot.command('give_vip', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return;
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [GIVE_VIP] Доступ запрещен для ${ctx.from.id}`);
+            return;
+        }
+        
         const args = ctx.message.text.split(' ');
-        if (args.length < 3) return ctx.reply('❌ /give_vip @user 7');
+        if (args.length < 3) {
+            return ctx.reply('❌ Используйте: /give_vip @user 7');
+        }
+        
         const username = args[1].replace('@', '');
         const days = parseInt(args[2]);
+        if (isNaN(days) || days <= 0) {
+            return ctx.reply('❌ Укажите положительное число дней.');
+        }
+        
         const db = readDB();
         let found = false;
+        let userId = null;
+        
         for (const id in db.users) {
             if (db.users[id].username === username) {
                 db.users[id].vip = { active: true, expiresAt: Date.now() + days * 24 * 60 * 60 * 1000 };
+                userId = id;
                 found = true;
                 break;
             }
         }
-        if (!found) return ctx.reply('❌ Игрок не найден');
+        
+        if (!found) {
+            console.log(`❌ [GIVE_VIP] Игрок @${username} не найден`);
+            return ctx.reply(`❌ Игрок @${username} не найден`);
+        }
+        
         writeDB(db);
-        await ctx.reply(`✅ ${username} получил VIP на ${days} дней`);
+        console.log(`✅ [GIVE_VIP] @${username} (${userId}) получил VIP на ${days} дней от ${ctx.from.id}`);
+        await ctx.reply(`✅ @${username} получил VIP на ${days} дней`);
     });
 
     // ===== /SAY =====
     bot.command('say', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return;
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [SAY] Доступ запрещен для ${ctx.from.id}`);
+            return;
+        }
+        
         const text = ctx.message.text.replace('/say ', '');
+        if (!text || text === '/say') {
+            return ctx.reply('❌ Напишите текст для рассылки: /say Привет всем!');
+        }
+        
+        console.log(`📢 [SAY] Рассылка от ${ctx.from.id}: "${text}"`);
+        
         const db = readDB();
         let count = 0;
+        let errors = 0;
+        
         for (const id in db.users) {
             try {
                 await ctx.telegram.sendMessage(id, `📢 ${text}`);
                 count++;
-            } catch (err) {}
+                // Задержка, чтобы не получить лимит от Telegram
+                await new Promise(resolve => setTimeout(resolve, 50));
+            } catch (err) {
+                errors++;
+            }
         }
-        await ctx.reply(`✅ Рассылка отправлена ${count} игрокам`);
+        
+        console.log(`✅ [SAY] Рассылка завершена: ${count} успешно, ${errors} ошибок`);
+        await ctx.reply(`✅ Рассылка отправлена ${count} игрокам (${errors} не доставлено)`);
     });
 
     // ===== /LIST_USERS =====
     bot.command('list_users', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return;
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [LIST_USERS] Доступ запрещен для ${ctx.from.id}`);
+            return;
+        }
+        
+        console.log(`📋 [LIST_USERS] Запрос списка от ${ctx.from.id}`);
+        
         const db = readDB();
         const users = Object.values(db.users);
-        if (users.length === 0) return ctx.reply('📭 Нет игроков');
+        
+        if (users.length === 0) {
+            return ctx.reply('📭 Нет игроков');
+        }
+        
+        // Сортируем по золоту (от большего к меньшему)
+        users.sort((a, b) => (b.gold || 0) - (a.gold || 0));
+        
         let text = `👥 ВСЕ ИГРОКИ (${users.length}):\n\n`;
-        users.forEach(u => {
-            text += `🆔 ${u.id} | @${u.username || 'unknown'} | 💰 ${u.gold} | 🏗️ ${u.level}\n`;
-        });
-        await ctx.reply(text.slice(0, 4000));
+        let count = 0;
+        for (const u of users) {
+            count++;
+            text += `${count}. @${u.username || 'unknown'} | 💰 ${u.gold} | 🏗️ ${u.level}\n`;
+            if (text.length > 3900) break; // Ограничение Telegram
+        }
+        
+        await ctx.reply(text);
+        console.log(`✅ [LIST_USERS] Отправлен список (${Math.min(users.length, count)} показано)`);
     });
 
     // ===== /DELETE_USER =====
     bot.command('delete_user', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return;
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [DELETE_USER] Доступ запрещен для ${ctx.from.id}`);
+            return;
+        }
+        
         const args = ctx.message.text.split(' ');
-        if (args.length < 2) return ctx.reply('❌ /delete_user @user');
+        if (args.length < 2) {
+            return ctx.reply('❌ Используйте: /delete_user @user');
+        }
+        
         const username = args[1].replace('@', '');
         const db = readDB();
         let found = false;
+        let userId = null;
+        
         for (const id in db.users) {
             if (db.users[id].username === username) {
+                userId = id;
                 delete db.users[id];
                 found = true;
                 break;
             }
         }
-        if (!found) return ctx.reply('❌ Игрок не найден');
+        
+        if (!found) {
+            console.log(`❌ [DELETE_USER] Игрок @${username} не найден`);
+            return ctx.reply(`❌ Игрок @${username} не найден`);
+        }
+        
         writeDB(db);
-        await ctx.reply(`✅ ${username} удалён`);
+        console.log(`🗑️ [DELETE_USER] @${username} (${userId}) удалён админом ${ctx.from.id}`);
+        await ctx.reply(`✅ @${username} удалён`);
     });
 
     // ===== /RESET_USER =====
     bot.command('reset_user', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return;
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [RESET_USER] Доступ запрещен для ${ctx.from.id}`);
+            return;
+        }
+        
         const args = ctx.message.text.split(' ');
-        if (args.length < 2) return ctx.reply('❌ /reset_user @user');
+        if (args.length < 2) {
+            return ctx.reply('❌ Используйте: /reset_user @user');
+        }
+        
         const username = args[1].replace('@', '');
         const db = readDB();
         let found = false;
+        let userId = null;
+        
         for (const id in db.users) {
             if (db.users[id].username === username) {
+                userId = id;
                 db.users[id].gold = 200;
                 db.users[id].food = 0;
                 db.users[id].coins = 0;
@@ -315,46 +443,130 @@ module.exports = (bot) => {
                 break;
             }
         }
-        if (!found) return ctx.reply('❌ Игрок не найден');
+        
+        if (!found) {
+            console.log(`❌ [RESET_USER] Игрок @${username} не найден`);
+            return ctx.reply(`❌ Игрок @${username} не найден`);
+        }
+        
         writeDB(db);
-        await ctx.reply(`✅ ${username} сброшен до начального состояния`);
+        console.log(`🔄 [RESET_USER] @${username} (${userId}) сброшен админом ${ctx.from.id}`);
+        await ctx.reply(`✅ @${username} сброшен до начального состояния`);
     });
 
     // ===== /BACKUP =====
     bot.command('backup', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return;
+        if (!isAdmin(ctx.from.id)) {
+            console.log(`⛔ [BACKUP] Доступ запрещен для ${ctx.from.id}`);
+            return;
+        }
+        
+        console.log(`📦 [BACKUP] Создание бекапа от ${ctx.from.id}`);
+        
         try {
             const db = readDB();
             const json = JSON.stringify(db, null, 2);
-            const filename = `backup_${new Date().toISOString().slice(0,10)}.json`
+            const filename = `backup_${new Date().toISOString().slice(0,10)}.json`;
+            
             await ctx.replyWithDocument({
                 source: Buffer.from(json, 'utf-8'),
                 filename: filename
             });
-            await ctx.reply(`✅ Бекап создан!`);
-            await ctx.reply(`Чтобы его применить введите команду /restore ${filename}`)
+            
+            console.log(`✅ [BACKUP] Бекап отправлен: ${filename} (${json.length} символов)`);
+            await ctx.reply(
+                `✅ Бекап создан!\n` +
+                `📌 Чтобы восстановить: ответьте на это сообщение командой /restore`
+            );
         } catch (err) {
-            console.error('❌ Ошибка бекапа:', err.message);
+            console.error('❌ [BACKUP] Ошибка:', err.message);
             await ctx.reply('❌ Ошибка при создании бекапа');
         }
     });
+
     // ===== /RESTORE =====
     bot.command('restore', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Доступ запрещён.');
-        
-        const args = ctx.message.text.split(' ');
-        if (args.length < 2) {
-            return ctx.reply('❌ Используй: /restore { Имя файла }');
+        // 1. Проверка прав
+        if (!isAdmin(ctx.from.id)) {
+            return ctx.reply('⛔ Доступ запрещен.');
         }
-        
-        const filename = args[1];
+
+        console.log(`📥 [RESTORE] Начало восстановления от ${ctx.from.id}`);
+
+        // 2. Проверяем, что это ответ на сообщение
+        const repliedMsg = ctx.message.reply_to_message;
+        if (!repliedMsg) {
+            console.log('⚠️ [RESTORE] Не ответ на сообщение');
+            return ctx.reply(
+                '❌ Ответьте на сообщение с файлом бекапа.\n' +
+                'Пример: отправьте /backup, а затем ответьте на его сообщение /restore'
+            );
+        }
+
+        // 3. Проверяем, что в исходном сообщении есть документ
+        if (!repliedMsg.document) {
+            console.log('⚠️ [RESTORE] В сообщении нет файла');
+            return ctx.reply('❌ В сообщении, на которое вы ответили, нет файла.');
+        }
+
+        const file = repliedMsg.document;
+        if (!file.file_name.endsWith('.json')) {
+            console.log(`⚠️ [RESTORE] Не JSON: ${file.file_name}`);
+            return ctx.reply('❌ Файл должен быть в формате .json');
+        }
+
+        console.log(`📄 [RESTORE] Файл: ${file.file_name} (${file.file_size} байт)`);
+
         try {
-            const data = fs.readFileSync(filename, 'utf-8');
-            const db = JSON.parse(data);
-            writeDB(db);
-            await ctx.reply(`✅ Бекап ${filename} восстановлен!`);
-        } catch (err) {
-            await ctx.reply(`❌ Не удалось восстановить ${filename}: ${err.message}`);
+            // 4. Скачиваем файл
+            console.log('⬇️ [RESTORE] Скачивание файла...');
+            const fileLink = await ctx.telegram.getFileLink(file.file_id);
+            const response = await fetch(fileLink);
+            const jsonText = await response.text();
+            console.log(`✅ [RESTORE] Файл скачан (${jsonText.length} символов)`);
+
+            // 5. Парсим JSON
+            let backupData;
+            try {
+                backupData = JSON.parse(jsonText);
+            } catch (parseErr) {
+                console.log('❌ [RESTORE] Ошибка парсинга JSON');
+                return ctx.reply('❌ Файл поврежден или это невалидный JSON.');
+            }
+
+            // 6. Проверяем структуру
+            if (!backupData.users || typeof backupData.users !== 'object') {
+                console.log('❌ [RESTORE] Неверная структура: нет ключа "users"');
+                return ctx.reply(
+                    '❌ Файл не соответствует структуре базы данных.\n' +
+                    'Ожидается ключ "users" с объектом пользователей.'
+                );
+            }
+
+            const userCount = Object.keys(backupData.users).length;
+            console.log(`👥 [RESTORE] В бекапе ${userCount} пользователей`);
+
+            // 7. Делаем резервную копию текущей БД
+            const DB_FILE = 'database.json';
+            if (fs.existsSync(DB_FILE)) {
+                const backupName = `database_auto_backup_${Date.now()}.json`;
+                fs.copyFileSync(DB_FILE, backupName);
+                console.log(`📀 [RESTORE] Создана копия: ${backupName}`);
+                await ctx.reply(`📀 Создана резервная копия текущей базы: ${backupName}`);
+            }
+
+            // 8. Восстанавливаем базу (перезаписываем)
+            writeDB(backupData);
+            console.log(`✅ [RESTORE] База восстановлена (${userCount} пользователей)`);
+
+            await ctx.reply(
+                `✅ База данных восстановлена из файла ${file.file_name}!\n` +
+                `👥 Количество пользователей: ${userCount}`
+            );
+
+        } catch (error) {
+            console.error('❌ [RESTORE] Ошибка:', error.message);
+            await ctx.reply(`❌ Ошибка при восстановлении: ${error.message}`);
         }
-    })
-};
+    });
+}

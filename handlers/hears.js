@@ -7,7 +7,8 @@ module.exports = (bot) => {
         await ctx.reply(
             `🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n` +
             `Версия: MVP 1.1\n` +
-            `Разработчик: @${ctx.botInfo.username}\n\n` +
+            `Разработчик: @DEDAYSON\n\n` +
+            `Исходник: https://github.com/Yakov-hub-python/antichniy-grad-bot\n\n` +
             `📖 Экономическая стратегия в Telegram.\n` +
             `Строй город, добывай ресурсы, сражайся с боссами и приводи друзей!`,
             MAIN_MENU

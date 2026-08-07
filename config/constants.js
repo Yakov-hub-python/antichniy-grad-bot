@@ -4,7 +4,6 @@ module.exports = {
         farm: 10,
         mine: 30,
         mint: 70,
-        market: 200,
         barracks: 50
     },
     BUILDING_NAMES: {
@@ -12,7 +11,6 @@ module.exports = {
         farm: '🌾 Ферма',
         mine: '⛏️ Шахта',
         mint: '🪙 Монетный двор',
-        market: '🏪 Рынок',
         barracks: '🪖 Казарма'
     },
     INCOME_INTERVALS: {

@@ -23,6 +23,14 @@ commands(bot);
 hears(bot);
 callbacks(bot);
 
+bot.catch((err, ctx) => {
+    if (err.response?.error_code === 429) {
+        // Просто логируем, но не даём боту упасть
+        console.warn(`⏳ Лимит запросов (${err.response.parameters?.retry_after || 5}с) — игнорируем`);
+        return; // Тишина — бот не падает
+    }
+    console.error('❌ Другая ошибка:', err);
+});
 // ===== ГЛОБАЛЬНЫЙ БОСС И CRON =====
 const { readDB, writeDB } = require('./utils/storage');
 cron.schedule('0 0,6,12,18 * * *', () => {
