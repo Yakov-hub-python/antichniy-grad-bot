@@ -1,9 +1,9 @@
 module.exports = {
     BUILDING_COSTS: {
         hut: 20,
-        farm: 10,
-        mine: 30,
-        mint: 70,
+        farm: 25,
+        mine: 60,
+        mint: 120,
         barracks: 50
     },
     BUILDING_NAMES: {

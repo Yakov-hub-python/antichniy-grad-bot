@@ -33,9 +33,9 @@ function calculateIncome(user) {
     const workers = Math.min(citizens, neededWorkers);
     if (workers === 0) return { gold: 0, food: 0, coins: 0 };
 
-    let gold = buildings.mine * 20;
+    let gold = buildings.mine * 15;
     let coins = buildings.mint * 10;
-    let food = buildings.farm * 20;
+    let food = buildings.farm * 5;
 
     const efficiency = workers / neededWorkers;
     gold = Math.floor(gold * efficiency);

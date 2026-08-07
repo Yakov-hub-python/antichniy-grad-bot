@@ -1,8 +1,8 @@
 const { getUser, saveUser } = require('../utils/storage');
 
 const PRICES = {
-    sell: { food: 1, coins: 2 },
-    buy: { food: 2, coins: 4 }
+    sell: { food: 1, coins: 3 },
+    buy: { food: 2, coins: 6 }
 };
 
 // ===== КНОПКА «РЫНОК» =====
@@ -15,7 +15,7 @@ async function showMarketMenu(ctx) {
         `🪙 Монеты: ${user.coins || 0}\n\n` +
         `📊 Курсы:\n` +
         `🍖 Еда: 1💰 (покупка: 2💰)\n` +
-        `🪙 Монеты: 2💰 (покупка: 4💰)\n\n` +
+        `🪙 Монеты: 3💰 (покупка: 6💰)\n\n` +
         `👇 Выбери действие:`,
         {
             reply_markup: {

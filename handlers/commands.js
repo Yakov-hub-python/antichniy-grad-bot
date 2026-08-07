@@ -101,7 +101,7 @@ module.exports = (bot) => {
             return ctx.reply('❌ Введи положительное число.');
         }
         const user = getUser(ctx.from.id);
-        const prices = { food: 1, coins: 2 };
+        const prices = { food: 1, coins: 3 };
         if (!prices[resource]) {
             return ctx.reply('❌ Можно продать только food или coins.');
         }
@@ -126,7 +126,7 @@ module.exports = (bot) => {
             return ctx.reply('❌ Введи положительное число.');
         }
         const user = getUser(ctx.from.id);
-        const prices = { food: 2, coins: 4 };
+        const prices = { food: 2, coins: 6 };
         if (!prices[resource]) {
             return ctx.reply('❌ Можно купить только food или coins.');
         }
