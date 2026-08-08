@@ -1,5 +1,5 @@
 const { getUser, saveUser } = require('../utils/storage');
-const { calculateIncome, getIncomeInterval, isVIP,getTodayBonus,generateDailyBonus } = require('../utils/helpers');
+const { calculateIncome, getIncomeInterval, isVIP } = require('../utils/helpers');
 
 module.exports = {
     collect: async (ctx) => {

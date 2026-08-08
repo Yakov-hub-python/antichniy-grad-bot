@@ -4,14 +4,12 @@ module.exports = {
         farm: 25,
         mine: 60,
         mint: 120,
-        barracks: 50
     },
     BUILDING_NAMES: {
         hut: '🏠 Хижина',
         farm: '🌾 Ферма',
         mine: '⛏️ Шахта',
-        mint: '🪙 Монетный двор',
-        barracks: '🪖 Казарма'
+        mint: '🪙 Монетный двор'
     },
     INCOME_INTERVALS: {
         regular: 5 * 60 * 1000,
@@ -24,7 +22,7 @@ module.exports = {
                 ['🏙️ Город', '👥 Пригласить друга'],
                 ['🎁 Ежедневный бонус'],
                 ['🛒 Магазин', '⚔️ Босс'],
-                ['🏆 Олимп', '🪖 Казармы']
+                ['🏆 Олимп', '🪖 Казарма']
             ],
         resize_keyboard: true
         }

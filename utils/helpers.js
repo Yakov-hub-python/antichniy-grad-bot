@@ -1,3 +1,5 @@
+const { getUser } = require('./storage');
+
 function isVIP(user) {
     return user.vip && user.vip.active && user.vip.expiresAt > Date.now();
 }
@@ -8,7 +10,7 @@ function getIncomeInterval(user) {
 }
 
 function getSoldiers(user) {
-    return user.buildings.barracks * 2 + Math.floor(user.citizens / 10);
+    return user.soldiers;
 }
 
 function getPersonalBossHP(user) {

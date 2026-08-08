@@ -19,15 +19,15 @@ module.exports = (bot) => {
     bot.action('copy_ref', require('../actions/referralActions').copy);
     bot.action('boss_personal', require('../actions/bossActions').attackPersonal);
     bot.action('boss_global', require('../actions/bossActions').attackGlobal);
-    bot.action('build_barracks', async (ctx) => {
+    bot.action('/^hire_warriors_(.+)/', async (ctx) => {
+        const count = ctx.match[1]
         const userId = ctx.from.id;
         const user = getUser(userId);
-        if (user.gold < 50) return ctx.reply('❌ Нужно 50 золота!');
-        user.gold -= 50;
-        user.buildings.barracks += 1;
-        const total = Object.values(user.buildings).reduce((a, b) => a + b, 0);
-        user.level = total + 1;
+        const cost = count*6;
+        if (user.coins < cost) return ctx.reply(`❌ Нужно ${cost} монет!`);
+        user.coins -= cost;
+        user.soldiers += 1;
         saveUser(userId, user);
-        await ctx.reply(`🪖 Казарма построена! Солдат: ${getSoldiers(user)}`);
+        await ctx.reply(`🪖 ${count} солдат нанято! Солдат: ${getSoldiers(user)}`);
     });
 };

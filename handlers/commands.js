@@ -54,19 +54,64 @@ module.exports = (bot) => {
         const user = getUser(ctx.from.id);
         const soldiers = getSoldiers(user);
         await ctx.reply(
-            `🪖 КАЗАРМЫ\n\n` +
-            `🪖 Солдаты: ${soldiers}\n` +
-            `🏗️ Казарм: ${user.buildings.barracks}\n` +
-            `💰 Цена: 50 золота\n\n` +
+            `🪖 КАЗАРМА\n\n` +
+            `🪖 Солдаты: ${soldiers}\n` + 
+            `💰 Цена: 1 воин = 6 монет\n\n` +
             `⚔️ Каждый солдат даёт 5 урона боссам.`,
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🪖 Построить казарму (50💰)', callback_data: 'build_barracks' }],
+                        [{ text: 'Нанять воинов', callback_data: 'hire_warriors_1' }],
                         [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
                     ]
                 }
             }
+        );
+    });
+    // ===== /HIRE =====
+    bot.command('hire', async (ctx) => {
+        const args = ctx.message.text.split(' ');
+        
+        // Проверка количества аргументов
+        if (args.length !== 2) {
+            return ctx.reply('❌ Используй: /hire <количество>');
+        }
+        
+        const amount = args[1].trim();
+        const number = Number(amount);
+        
+        // Проверка валидности числа
+        if (!Number.isInteger(number) || number <= 0) {
+            return ctx.reply('❌ Введите целое положительное число');
+        }
+        
+        // Максимальное количество (защита от спама)
+        const MAX_HIRE = 1000;
+        if (number > MAX_HIRE) {
+            return ctx.reply(`❌ Нельзя нанять больше ${MAX_HIRE} воинов за раз`);
+        }
+        
+        const user = getUser(ctx.from.id);
+        const cost = number * 6;
+        
+        if (!user) {
+            return ctx.reply('❌ Пользователь не найден');
+        }
+        
+        if (user.coins < cost) {
+            const needed = cost - user.coins;
+            return ctx.reply(`❌ Не хватает монет! Нужно еще ${needed} монет. Всего нужно: ${cost}`);
+        }
+        
+        // Выполняем операцию
+        user.coins -= cost;
+        user.soldiers += number;
+        saveUser(ctx.from.id, user);
+        
+        ctx.reply(
+            `✅ Нанято ${number} воинов за ${cost} монет\n` +
+            `📊 Всего воинов: ${user.soldiers}\n` +
+            `💰 Осталось монет: ${user.coins}`
         );
     });
     // ===== /HELP =====
@@ -77,13 +122,14 @@ module.exports = (bot) => {
             `/city — город\n` +
             `/build — строительство\n` +
             `/income — собрать доход\n` +
-            `/sell — продать ресурс (sell food 10)\n` +
-            `/buy — купить ресурс (buy food 10)\n` +
+            `/sell — продать ресурс (/sell [food/coins] 10)\n` +
+            `/buy — купить ресурс (/buy [food/coins] 10)\n` +
             `/boss — боссы\n` +
             `/olymp — топ-10\n` +
             `/daily — ежедневный бонус\n` +
             `/referral — реферальная ссылка\n` +
-            `/barracks — казармы\n` +
+            `/barracks — казарма\n` +
+            `/hire — Нанять воинов (/hire 10)\n` +
             `/help — помощь\n\n` +
             `🏛️ Удачи, градоначальник!`
         );
@@ -428,6 +474,7 @@ module.exports = (bot) => {
                 db.users[id].food = 0;
                 db.users[id].coins = 0;
                 db.users[id].citizens = 5;
+                db.users[id].soldiers = 0;
                 db.users[id].level = 1;
                 db.users[id].buildings = { hut: 0, farm: 0, mine: 0, mint: 0, market: 0, barracks: 0 };
                 db.users[id].lastIncome = Date.now();

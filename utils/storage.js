@@ -35,13 +35,17 @@ function writeDB(data) {
 
 function getUser(id) {
     const db = readDB();
+    let needSave = false;
+    
     if (!db.users[id]) {
+        // Создаем нового пользователя с полем soldiers
         db.users[id] = {
             id: id,
             gold: 200,
             food: 0,
             coins: 0,
             citizens: 5,
+            soldiers: 0,  // Добавлено
             level: 1,
             buildings: {
                 hut: 0,
@@ -67,8 +71,47 @@ function getUser(id) {
             },
             username: 'unknown'
         };
-        writeDB(db);
+        needSave = true;
+    } else {
+        // Проверяем существующего пользователя
+        const user = db.users[id];
+        
+        if (user.soldiers === undefined) {
+            user.soldiers = 0;
+            needSave = true;
+        }
+        
+        // Добавьте другие проверки по необходимости
+        if (user.coins === undefined) {
+            user.coins = 0;
+            needSave = true;
+        }
+        
+        if (user.food === undefined) {
+            user.food = 0;
+            needSave = true;
+        }
+        
+        // Проверка buildings
+        if (!user.buildings) {
+            user.buildings = { hut: 0, farm: 0, mine: 0, mint: 0, market: 0, barracks: 0 };
+            needSave = true;
+        } else {
+            const defaultBuildings = { hut: 0, farm: 0, mine: 0, mint: 0, market: 0, barracks: 0 };
+            for (const key in defaultBuildings) {
+                if (user.buildings[key] === undefined) {
+                    user.buildings[key] = 0;
+                    needSave = true;
+                }
+            }
+        }
     }
+    
+    if (needSave) {
+        writeDB(db);
+        console.log(`🔄 Обновлен пользователь ${id}`);
+    }
+    
     return db.users[id];
 }
 

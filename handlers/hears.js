@@ -22,19 +22,18 @@ module.exports = (bot) => {
     bot.hears('⚔️ Босс', require('../hears/boss').show);
     bot.hears('🏆 Олимп', require('../hears/olymp').show);
     bot.hears('🛒 Рынок', require('../hears/market').showMarketMenu);
-    bot.hears('🪖 Казармы', async (ctx) => {
+    bot.hears('🪖 Казарма', async (ctx) => {
         const user = getUser(ctx.from.id);
         const soldiers = getSoldiers(user);
         await ctx.reply(
-            `🪖 КАЗАРМЫ\n\n` +
-            `🪖 Солдаты: ${soldiers}\n` +
-            `🏗️ Казарм: ${user.buildings.barracks}\n` +
-            `💰 Цена: 50 золота\n\n` +
+            `🪖 КАЗАРМА\n\n` +
+            `🪖 Солдаты: ${soldiers}\n` + 
+            `💰 Цена: 1 воин = 6 монет\n\n` +
             `⚔️ Каждый солдат даёт 5 урона боссам.`,
             {
                 reply_markup: {
                     inline_keyboard: [
-                        [{ text: '🪖 Построить казарму (50💰)', callback_data: 'build_barracks' }],
+                        [{ text: 'Нанять воинов', callback_data: 'hire_warriors_1' }],
                         [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
                     ]
                 }
