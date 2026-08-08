@@ -12,8 +12,8 @@ module.exports = {
         mint: '🪙 Монетный двор'
     },
     INCOME_INTERVALS: {
-        regular: 5 * 60 * 1000,
-        vip: 3 * 60 * 1000
+        regular: 2 * 60 * 1000,
+        vip: 60 * 1000 + 30 * 1000
     },
     MAIN_MENU: {
         reply_markup: {

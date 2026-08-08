@@ -37,7 +37,7 @@ module.exports = async (ctx) => {
     saveUser(userId, user);
 
     await ctx.reply(
-        `🏛️ ДОБРО ПОЖАЛОВАТЬ,${ctx.from.first_name.toUpperCase()}!\n\n` +
+        `🏛️ ДОБРО ПОЖАЛОВАТЬ, ${ctx.from.first_name.toUpperCase()}!\n\n` +
         `💰 Золото: ${user.gold}\n` +
         `🏗️ Уровень города: ${user.level}\n` +
         `👥 Друзей: ${user.referrals ? user.referrals.length : 0}\n\n` +

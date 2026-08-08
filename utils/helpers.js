@@ -35,19 +35,19 @@ function calculateIncome(user) {
     const workers = Math.min(citizens, neededWorkers);
     if (workers === 0) return { gold: 0, food: 0, coins: 0 };
 
-    let gold = buildings.mine * 15;
-    let coins = buildings.mint * 10;
-    let food = buildings.farm * 5;
+    let gold = buildings.mine * 7;
+    let coins = buildings.mint * 6;
+    let food = buildings.farm * 2;
 
     const efficiency = workers / neededWorkers;
     gold = Math.floor(gold * efficiency);
     coins = Math.floor(coins * efficiency);
     food = Math.floor(food * efficiency);
 
-    const multiplier = isVIP(user) ? 2 : 1;
-    gold *= multiplier;
-    coins *= multiplier;
-    food *= multiplier;
+    const multiplier = isVIP(user) ? 1.33 : 1;
+    gold *= Math.floor(multiplier);
+    coins *= Math.floor(multiplier);
+    food *= Math.floor(multiplier);
 
     if (user.food < citizens) {
         gold = Math.floor(gold * 0.8);

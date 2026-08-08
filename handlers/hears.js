@@ -10,6 +10,8 @@ module.exports = (bot) => {
             `Разработчик: @DEDAYSON\n\n` +
             `Исходник: https://github.com/Yakov-hub-python/antichniy-grad-bot\n\n` +
             `📖 Экономическая стратегия в Telegram.\n` +
+            `Telegram канал: @antichniy_grad\n` +
+            `Общий чат: @antichniy_chat\n` +
             `Строй город, добывай ресурсы, сражайся с боссами и приводи друзей!`,
             MAIN_MENU
         );
