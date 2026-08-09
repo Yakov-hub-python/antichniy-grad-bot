@@ -44,9 +44,9 @@ function calculateIncome(user) {
     if (workers === 0 || neededWorkers === 0) return { gold: 0, food: 0, coins: 0 };
 
     // Базовый доход
-    let gold = (buildings.mine || 0) * 7 + (buildings.quarry || 0) * 390;
-    let food = (buildings.farm || 0) * 2 + (buildings.field || 0) * 410;
-    let coins = (buildings.mint || 0) * 6 + (buildings.mint_factory || 0) * 750;
+    let gold = (buildings.mine || 0) * 7 + (buildings.quarry || 0) * 200; // было 390
+    let food = (buildings.farm || 0) * 2 + (buildings.field || 0) * 250;  // было 410
+    let coins = (buildings.mint || 0) * 6 + (buildings.mint_factory || 0) * 500; // было 840
 
     // Эффективность
     const efficiency = workers / neededWorkers;

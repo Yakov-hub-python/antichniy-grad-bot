@@ -6,7 +6,7 @@ module.exports = (bot) => {
     bot.hears('ℹ️ О боте', async (ctx) => {
         await ctx.reply(
             `🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n` +
-            `Версия: MVP 1.1\n` +
+            `Версия: 1.2\n` +
             `Разработчик: @DEDAYSON\n\n` +
             `Исходник: https://github.com/Yakov-hub-python/antichniy-grad-bot\n\n` +
             `📖 Экономическая стратегия в Telegram.\n` +

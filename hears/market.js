@@ -46,12 +46,10 @@ async function sellResource(ctx, resource) {
     let price = PRICES.sell[resource];
     const amount = 1;
 
-    // Бонус на продажу еды
     if (resource === 'food' && todayBonus.type === 'sell_food') {
         price = Math.floor(price * todayBonus.multiplier);
     }
     
-    // Бонус на рынок
     if (todayBonus.type === 'market') {
         price = Math.floor(price * todayBonus.multiplier);
     }
@@ -70,10 +68,33 @@ async function sellResource(ctx, resource) {
     await showMarketMenu(ctx);
 }
 
-// ... остальные функции
+async function buyResource(ctx, resource) {
+    const user = getUser(ctx.from.id);
+    const todayBonus = getTodayBonus();
+    
+    let price = PRICES.buy[resource];
+    const amount = 1;
 
+    // Бонус на рынок не влияет на покупку (только продажа)
+    if (!price) return ctx.reply('❌ Такого ресурса нет.');
+    
+    const cost = amount * price;
+    if (user.gold < cost) {
+        return ctx.reply(`❌ Нужно ${cost} золота, у тебя ${user.gold}.`);
+    }
+
+    user.gold -= cost;
+    user[resource] = (user[resource] || 0) + amount;
+    saveUser(ctx.from.id, user);
+
+    await ctx.answerCbQuery(`✅ Куплено ${amount} ${resource} за ${cost}💰`);
+    await ctx.reply(`✅ Куплено ${amount} ${resource} за ${cost} золота.`);
+    await showMarketMenu(ctx);
+}
+
+// ===== ВАЖНО: экспортируем ВСЕ функции =====
 module.exports = {
     showMarketMenu,
     sellResource,
-    buyResource
+    buyResource  // ✅ теперь определена
 };

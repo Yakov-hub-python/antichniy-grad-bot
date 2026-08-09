@@ -8,9 +8,9 @@ module.exports = {
         await market.sellResource(ctx, 'coins');
     },
     buyFood: async (ctx) => {
-        await market.buyResource(ctx, 'food');
+        await market.buyResource(ctx, 'food');  // ✅ buyResource есть
     },
     buyCoins: async (ctx) => {
-        await market.buyResource(ctx, 'coins');
+        await market.buyResource(ctx, 'coins'); // ✅ buyResource есть
     }
 };
