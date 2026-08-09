@@ -33,19 +33,35 @@ function writeDB(data) {
     }
 }
 
+// ===== НОВАЯ ФУНКЦИЯ МИГРАЦИИ =====
+function migrateUser(user) {
+    let needSave = false;
+    
+    // Проверяем и добавляем новые здания
+    const newBuildings = ['field', 'quarry', 'mint_factory'];
+    for (const building of newBuildings) {
+        if (user.buildings[building] === undefined) {
+            user.buildings[building] = 0;
+            needSave = true;
+        }
+    }
+    
+    return needSave;
+}
+
 function getUser(id) {
     const db = readDB();
     let needSave = false;
     
     if (!db.users[id]) {
-        // Создаем нового пользователя с полем soldiers
+        // Новый пользователь
         db.users[id] = {
             id: id,
             gold: 200,
             food: 0,
             coins: 0,
             citizens: 5,
-            soldiers: 0,  // Добавлено
+            soldiers: 0,
             level: 1,
             buildings: {
                 hut: 0,
@@ -53,7 +69,11 @@ function getUser(id) {
                 mine: 0,
                 mint: 0,
                 market: 0,
-                barracks: 0
+                barracks: 0,
+                // НОВЫЕ ЗДАНИЯ
+                field: 0,
+                quarry: 0,
+                mint_factory: 0
             },
             lastIncome: Date.now(),
             lastDaily: null,
@@ -73,43 +93,81 @@ function getUser(id) {
         };
         needSave = true;
     } else {
-        // Проверяем существующего пользователя
+        // Существующий пользователь - проверяем поля
         const user = db.users[id];
         
+        // Проверяем soldiers
         if (user.soldiers === undefined) {
             user.soldiers = 0;
             needSave = true;
         }
         
-        // Добавьте другие проверки по необходимости
+        // Проверяем coins
         if (user.coins === undefined) {
             user.coins = 0;
             needSave = true;
         }
         
+        // Проверяем food
         if (user.food === undefined) {
             user.food = 0;
             needSave = true;
         }
         
-        // Проверка buildings
+        // Проверяем bossKills
+        if (user.bossKills === undefined) {
+            user.bossKills = 0;
+            needSave = true;
+        }
+        
+        // Проверяем referrals
+        if (user.referrals === undefined) {
+            user.referrals = [];
+            needSave = true;
+        }
+        
+        // Проверяем personalBoss
+        if (user.personalBoss === undefined) {
+            user.personalBoss = {
+                hp: 5000,
+                maxHp: 5000,
+                respawnAt: 0,
+                kills: 0
+            };
+            needSave = true;
+        }
+        
+        // ===== МИГРАЦИЯ ЗДАНИЙ =====
         if (!user.buildings) {
-            user.buildings = { hut: 0, farm: 0, mine: 0, mint: 0, market: 0, barracks: 0 };
+            // Если buildings вообще нет - создаем с нуля
+            user.buildings = {
+                hut: 0,
+                farm: 0,
+                mine: 0,
+                mint: 0,
+                market: 0,
+                barracks: 0,
+                field: 0,
+                quarry: 0,
+                mint_factory: 0
+            };
             needSave = true;
         } else {
-            const defaultBuildings = { hut: 0, farm: 0, mine: 0, mint: 0, market: 0, barracks: 0 };
-            for (const key in defaultBuildings) {
-                if (user.buildings[key] === undefined) {
-                    user.buildings[key] = 0;
+            // Проверяем каждое новое здание
+            const newBuildings = ['field', 'quarry', 'mint_factory'];
+            for (const building of newBuildings) {
+                if (user.buildings[building] === undefined) {
+                    user.buildings[building] = 0;
                     needSave = true;
                 }
             }
         }
-    }
-    
-    if (needSave) {
-        writeDB(db);
-        console.log(`🔄 Обновлен пользователь ${id}`);
+        
+        // Сохраняем если были изменения
+        if (needSave) {
+            writeDB(db);
+            console.log(`🔄 Обновлены поля для пользователя ${id}`);
+        }
     }
     
     return db.users[id];
@@ -121,4 +179,57 @@ function saveUser(id, data) {
     writeDB(db);
 }
 
-module.exports = { readDB, writeDB, getUser, saveUser };
+// ===== ФУНКЦИЯ ДЛЯ МАССОВОЙ МИГРАЦИИ =====
+function migrateAllUsers() {
+    console.log('🔄 Запуск массовой миграции...');
+    const db = readDB();
+    let count = 0;
+    
+    for (const id in db.users) {
+        const user = db.users[id];
+        let needSave = false;
+        
+        // Проверяем и добавляем новые здания
+        const newBuildings = ['field', 'quarry', 'mint_factory'];
+        if (!user.buildings) {
+            user.buildings = {
+                hut: 0,
+                farm: 0,
+                mine: 0,
+                mint: 0,
+                market: 0,
+                barracks: 0,
+                field: 0,
+                quarry: 0,
+                mint_factory: 0
+            };
+            needSave = true;
+        } else {
+            for (const building of newBuildings) {
+                if (user.buildings[building] === undefined) {
+                    user.buildings[building] = 0;
+                    needSave = true;
+                }
+            }
+        }
+        
+        // Добавляем coins если нет
+        if (user.coins === undefined) {
+            user.coins = 0;
+            needSave = true;
+        }
+        
+        if (needSave) {
+            count++;
+        }
+    }
+    
+    if (count > 0) {
+        writeDB(db);
+        console.log(`✅ Миграция завершена! Обновлено ${count} пользователей`);
+    } else {
+        console.log('✅ Миграция не требуется - все пользователи актуальны');
+    }
+}
+
+module.exports = { readDB, writeDB, getUser, saveUser, migrateAllUsers };
