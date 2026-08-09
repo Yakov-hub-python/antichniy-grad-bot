@@ -118,20 +118,31 @@ module.exports = (bot) => {
     bot.command('help', async (ctx) => {
         await ctx.reply(
             `📖 СПИСОК КОМАНД:\n\n` +
+            `🎮 ИГРОВЫЕ:\n` +
             `/start — начать игру\n` +
             `/city — город\n` +
             `/build — строительство\n` +
             `/income — собрать доход\n` +
-            `/sell — продать ресурс (/sell [food/coins] 10)\n` +
-            `/buy — купить ресурс (/buy [food/coins] 10)\n` +
+            `/daily — ежедневный бонус\n` +
             `/boss — боссы\n` +
             `/olymp — топ-10\n` +
-            `/daily — ежедневный бонус\n` +
-            `/referral — реферальная ссылка\n` +
+            `/profile — мой профиль\n\n` +
+            `🪖 АРМИЯ:\n` +
             `/barracks — казарма\n` +
-            `/hire — Нанять воинов (/hire 10)\n` +
-            `/help — помощь\n\n` +
-            `🏛️ Удачи, градоначальник!`
+            `/hire 10 — нанять воинов\n\n` +
+            `👥 РЕФЕРАЛЫ:\n` +
+            `/referral — ссылка для друзей\n\n` +
+            `🏪 ТОРГОВЛЯ:\n` +
+            `/market — рынок\n` +
+            `/sell food 10 — продать\n` +
+            `/buy food 10 — купить\n\n` +
+            `🎁 ПРОМОКОДЫ:\n` +
+            `/promo HELLO2026 — активировать код\n\n` +
+            `🛠 ОСТАЛЬНОЕ:\n` +
+            `/help — помощь\n` +
+            `/menu — главное меню\n\n` +
+            `📢 Канал: @antichniy_grad_channel\n` +
+            `💬 Чат: @antichniy_grad_chat`
         );
     });
 
@@ -214,11 +225,9 @@ module.exports = (bot) => {
     // ===== /ADMIN =====
     bot.command('admin', async (ctx) => {
         if (!isAdmin(ctx.from.id)) {
-            console.log(`⛔ [ADMIN] Доступ запрещен для ${ctx.from.id}`);
             return ctx.reply('⛔ Доступ запрещён.');
         }
-        
-        console.log(`👑 [ADMIN] Панель открыта для ${ctx.from.id}`);
+
         await ctx.reply(
             `👑 АДМИН-ПАНЕЛЬ\n\n` +
             `📌 Команды:\n` +
@@ -229,9 +238,15 @@ module.exports = (bot) => {
             `/list_users\n` +
             `/delete_user @user\n` +
             `/reset_user @user\n` +
-            `/backup — скачать бекап БД\n` +
-            `/restore — восстановить БД (ответом на бекап)`,
-            MAIN_MENU
+            `/backup — скачать бэкап\n` +
+            `/restore — восстановить БД\n\n` +
+            `🎁 ПРОМОКОДЫ:\n` +
+            `/newpromo gold 100 HELLO\n` +
+            `/removepromo HELLO\n` +
+            `/promolist\n\n` +
+            `📢 КАНАЛ И ЧАТ:\n` +
+            `Канал: @antichniy_grad_channel\n` +
+            `Чат: @antichniy_grad_chat`
         );
     });
 

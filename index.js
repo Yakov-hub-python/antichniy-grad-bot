@@ -18,7 +18,9 @@ const commands = require('./handlers/commands');
 const hears = require('./handlers/hears');
 const callbacks = require('./handlers/callback');
 const { readDB, writeDB } = require('./utils/storage');
+const promoHandler = require('./handlers/promo');
 
+promoHandler(bot);
 commands(bot);
 hears(bot);
 callbacks(bot);
@@ -31,11 +33,6 @@ function log(type, message) {
 
 log('START', '🚀 Бот запущен');
 
-const { migrateAllUsers } = require('./utils/storage');
-
-// ===== МИГРАЦИЯ БД ПРИ СТАРТЕ =====
-console.log('🔄 Проверка структуры БД...');
-migrateAllUsers();
 
 // ===== ГЛОБАЛЬНЫЙ БОСС =====
 cron.schedule('0 0,6,12,18 * * *', () => {

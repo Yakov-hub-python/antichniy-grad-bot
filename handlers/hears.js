@@ -8,6 +8,7 @@ module.exports = (bot) => {
             `🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n` +
             `Версия: 1.2\n` +
             `Разработчик: @DEDAYSON\n\n` +
+            `Огоромная благодарность: @KimiAntonelliF1DriverOficcial\n\n` +
             `Исходник: https://github.com/Yakov-hub-python/antichniy-grad-bot\n\n` +
             `📖 Экономическая стратегия в Telegram.\n` +
             `Telegram канал: @antichniy_grad\n` +
