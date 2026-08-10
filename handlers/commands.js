@@ -3,6 +3,7 @@ const { MAIN_MENU } = require('../config/constants');
 const { getSoldiers } = require('../utils/helpers');
 const fs = require('fs');
 const path = require('path');
+const { showMainMenu } = require('../handlers/menu');
 
 // ===== ПРОВЕРКА АДМИНА С ЛОГИРОВАНИЕМ =====
 function isAdmin(userId) {
@@ -25,8 +26,9 @@ module.exports = (bot) => {
     bot.start(require('./start'));
 
     // ==== /MENU =====
-    bot.command('menu',(ctx) => {
-        ctx.reply('🏛️ Главное меню',MAIN_MENU)
+    bot.command('menu',async (ctx) => {
+        ctx.reply('🏛️ Главное меню')
+        await showMainMenu(ctx);
     })
     // ===== /CITY =====
     bot.command('city', require('../hears/city').show);

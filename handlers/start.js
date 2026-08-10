@@ -1,5 +1,6 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { MAIN_MENU } = require('../config/constants');
+const { showMainMenu } = require('../handlers/menu');
 
 module.exports = async (ctx) => {
     const userId = ctx.from.id;
@@ -41,7 +42,7 @@ module.exports = async (ctx) => {
         `💰 Золото: ${user.gold}\n` +
         `🏗️ Уровень города: ${user.level}\n` +
         `👥 Друзей: ${user.referrals ? user.referrals.length : 0}\n\n` +
-        `Строй, воюй и приводи друзей!`,
-        MAIN_MENU
+        `Строй, воюй и приводи друзей!`
     );
+    await showMainMenu(ctx);
 };

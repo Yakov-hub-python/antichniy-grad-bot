@@ -19,13 +19,14 @@ const hears = require('./handlers/hears');
 const callbacks = require('./handlers/callback');
 const { readDB, writeDB } = require('./utils/storage');
 const promoHandler = require('./handlers/promo');
+const { handleAdvancedCommand } = require('./hears/advanced');
 
 promoHandler(bot);
 commands(bot);
 hears(bot);
 callbacks(bot);
 
-// ===== ПРОСТОЙ ЛОГГЕР ТОЛЬКО ДЛЯ ВАЖНОГО =====
+
 function log(type, message) {
     const time = new Date().toLocaleString('ru-RU');
     console.log(`[${time}] [${type}] ${message}`);
@@ -33,6 +34,24 @@ function log(type, message) {
 
 log('START', '🚀 Бот запущен');
 
+
+bot.on('text', async (ctx) => {
+    const text = ctx.message.text;
+    
+    // Пропускаем команды (начинаются с /)
+    if (text.startsWith('/')) return;
+    
+    // Пропускаем стандартные кнопки
+    const buttons = [
+        'ℹ️ О боте', '🏙️ Город', '👥 Пригласить друга',
+        '🎁 Ежедневный бонус', '🛒 Магазин', '⚔️ Босс',
+        '🏆 Олимп', '🪖 Казарма'
+    ];
+    if (buttons.includes(text)) return;
+    
+    // Пробуем обработать как продвинутую команду
+    await handleAdvancedCommand(ctx);
+});
 
 // ===== ГЛОБАЛЬНЫЙ БОСС =====
 cron.schedule('0 0,6,12,18 * * *', () => {

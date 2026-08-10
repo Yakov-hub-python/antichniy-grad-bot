@@ -1,6 +1,7 @@
 const { getUser } = require('../utils/storage');
 const { MAIN_MENU } = require('../config/constants');
 const { getSoldiers } = require('../utils/helpers');
+const { showMainMenu } = require('../handlers/menu');
 
 module.exports = (bot) => {
     bot.hears('ℹ️ О боте', async (ctx) => {
@@ -13,9 +14,9 @@ module.exports = (bot) => {
             `📖 Экономическая стратегия в Telegram.\n` +
             `Telegram канал: @antichniy_grad\n` +
             `Общий чат: @antichniy_chat\n` +
-            `Строй город, добывай ресурсы, сражайся с боссами и приводи друзей!`,
-            MAIN_MENU
+            `Строй город, добывай ресурсы, сражайся с боссами и приводи друзей!`
         );
+        await showMainMenu(ctx);
     });
 
     bot.hears('🏙️ Город', require('../hears/city').show);
