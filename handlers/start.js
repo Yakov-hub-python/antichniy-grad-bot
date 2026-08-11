@@ -1,6 +1,8 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { MAIN_MENU } = require('../config/constants');
 const { showMainMenu } = require('../handlers/menu');
+const { updateQuestProgress } = require('../utils/quests');
+const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 
 module.exports = async (ctx) => {
     const userId = ctx.from.id;
@@ -9,6 +11,7 @@ module.exports = async (ctx) => {
     user.username = ctx.from.username || ctx.from.first_name || 'unknown';
     saveUser(userId, user);
 
+    // ===== ОБРАБОТКА РЕФЕРАЛЬНОЙ ССЫЛКИ =====
     if (text.includes('ref_')) {
         const refId = text.split('_')[1];
         if (refId == userId) return await ctx.reply('❌ Нельзя пригласить самого себя!');
@@ -28,15 +31,51 @@ module.exports = async (ctx) => {
 
         writeDB(db);
         await ctx.reply(`🎉 Ты пришёл по ссылке друга! +200💰 и VIP 3 дня!`);
+        
         try {
             await ctx.telegram.sendMessage(refId, `👤 Твой друг @${user.username} пришёл! +200💰 и VIP 3 дня!`);
         } catch (err) {}
-    }
 
+        // ===== ОБНОВЛЯЕМ КВЕСТ У ПРИГЛАСИВШЕГО (referral) =====
+        const refUser = getUser(refId);
+        const questResult = updateQuestProgress(refUser, 'referral');
+        if (questResult?.completed) {
+            try {
+                await ctx.telegram.sendMessage(refId, 
+                    `🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\nНаграда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`
+                );
+            } catch (err) {}
+        }
+
+        // ===== ПРОВЕРЯЕМ ДОСТИЖЕНИЯ У ПРИГЛАСИВШЕГО =====
+        const newAchievements = checkAchievements(refUser);
+        for (const ach of newAchievements) {
+            try {
+                await ctx.telegram.sendMessage(refId, 
+                    `🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`
+                );
+                claimAchievementReward(refUser, ach);
+                await ctx.telegram.sendMessage(refId, 
+                    `🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`
+                );
+            } catch (err) {}
+        }
+    }
+    
+    // ===== ОБНОВЛЯЕМ УРОВЕНЬ =====
     const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
     user.level = totalBuildings + 1;
     saveUser(userId, user);
 
+    // ===== ПРОВЕРЯЕМ ДОСТИЖЕНИЯ =====
+    const newAchievements = checkAchievements(user);
+    for (const ach of newAchievements) {
+        await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
+        claimAchievementReward(user, ach);
+        await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
+    }
+
+    // ===== ПРИВЕТСТВИЕ =====
     await ctx.reply(
         `🏛️ ДОБРО ПОЖАЛОВАТЬ, ${ctx.from.first_name.toUpperCase()}!\n\n` +
         `💰 Золото: ${user.gold}\n` +

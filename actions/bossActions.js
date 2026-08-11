@@ -32,7 +32,20 @@ module.exports = {
 
             user.personalBoss = personal;
             saveUser(userId, user);
+            const { updateQuestProgress } = require('../utils/quests');
+            const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 
+            const questResult = updateQuestProgress(user, 'boss');
+            if (questResult?.completed) {
+                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\nНаграда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+            }
+
+            const newAchievements = checkAchievements(user);
+            for (const ach of newAchievements) {
+                await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
+                claimAchievementReward(user, ach);
+                await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
+            }
             await ctx.reply(
                 `⚔️ ЛИЧНЫЙ БОСС ПОВЕРЖЕН!\n` +
                 `💰 +${reward} золота!\n` +

@@ -219,7 +219,69 @@ module.exports = (bot) => {
             `👥 Друзей: ${user.referrals?.length || 0}`
         );
     });
+    bot.command('quests', async (ctx) => {
+        const userId = ctx.from.id;
+        const user = getUser(userId);
+        const { getDailyQuest } = require('../utils/quests');
+        
+        const quest = getDailyQuest(user);
+        
+        if (quest.completed) {
+            return ctx.reply(`✅ КВЕСТ ВЫПОЛНЕН!\n\n${quest.name}\n🏆 Награда: ${quest.reward === 'vip_3' ? 'VIP 3 дня' : quest.reward + '💰'}\n\nЗабери награду автоматически!`);
+        }
+        
+        const progress = Math.min(quest.progress, quest.target);
+        const percent = Math.floor((progress / quest.target) * 10);
+        const bar = '█'.repeat(percent) + '░'.repeat(10 - percent);
+        
+        await ctx.reply(
+            `🎯 ЕЖЕДНЕВНЫЙ КВЕСТ\n\n` +
+            `${quest.name}\n` +
+            `📊 Прогресс: ${bar}\n` +
+            `${progress}/${quest.target}\n\n` +
+            `🏆 Награда: ${quest.reward === 'vip_3' ? 'VIP 3 дня' : quest.reward + '💰'}\n` +
+            `⏳ Осталось: ${Math.floor((quest.expiresAt - Date.now()) / 3600000)} часов`
+        );
+    });
 
+    // ============================================================
+    // ДОСТИЖЕНИЯ
+    // ============================================================
+
+    // /achievements — показать все достижения
+    bot.command('achievements', async (ctx) => {
+        const userId = ctx.from.id;
+        const user = getUser(userId);
+        const { getAchievements } = require('../utils/achievements');
+        
+        const achievements = getAchievements(user);
+        const unlocked = achievements.filter(a => a.unlocked);
+        const locked = achievements.filter(a => !a.unlocked);
+        
+        let text = '🏆 ДОСТИЖЕНИЯ\n\n';
+        text += `✅ Получено: ${unlocked.length}/${achievements.length}\n\n`;
+        
+        if (unlocked.length > 0) {
+            text += '📌 ПОЛУЧЕНЫ:\n';
+            for (const a of unlocked) {
+                text += `  ✅ ${a.name}\n`;
+            }
+            text += '\n';
+        }
+        
+        if (locked.length > 0) {
+            text += '📌 НЕ ПОЛУЧЕНЫ:\n';
+            const next = locked.slice(0, 5);
+            for (const a of next) {
+                text += `  ⬜ ${a.name} — ${a.description}\n`;
+            }
+            if (locked.length > 5) {
+                text += `  ... и ещё ${locked.length - 5}\n`;
+            }
+        }
+        
+        await ctx.reply(text);
+    });
     // ============================================
     // ========== АДМИН-КОМАНДЫ ==========
     // ============================================

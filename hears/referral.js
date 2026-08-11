@@ -1,4 +1,5 @@
-const { getUser } = require('../utils/storage');
+const { getUser, saveUser } = require('../utils/storage');
+const { updateQuestProgress } = require('../utils/quests');
 
 module.exports = {
     show: async (ctx) => {
@@ -8,6 +9,14 @@ module.exports = {
         const refLink = `https://t.me/${botName}?start=ref_${userId}`;
         const refCount = user.referrals ? user.referrals.length : 0;
         const vipDays = refCount >= 3 ? 7 : 3;
+
+        // ===== ПРОВЕРЯЕМ КВЕСТ (referral) =====
+        // Это сработает, когда игрок заходит в рефералку и у него уже есть друзья
+        const questResult = updateQuestProgress(user, 'referral', refCount);
+        if (questResult?.completed) {
+            // Не отправляем сообщение здесь, чтобы не спамить
+            // Но отмечаем, что квест выполнен
+        }
 
         await ctx.reply(
             `👥 ПРИГЛАСИ ДРУГА!\n\n` +
@@ -26,5 +35,14 @@ module.exports = {
                 }
             }
         );
+
+        // ===== ЕСЛИ КВЕСТ ВЫПОЛНЕН — СООБЩАЕМ =====
+        if (questResult?.completed) {
+            await ctx.reply(
+                `🎉 КВЕСТ ВЫПОЛНЕН!\n` +
+                `${questResult.quest.name}\n` +
+                `Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`
+            );
+        }
     }
 };

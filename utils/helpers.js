@@ -1,5 +1,4 @@
 const { getUser } = require('./storage');
-const { getTodayBonus } = require('./dailyBonus');
 
 function isVIP(user) {
     return user.vip && user.vip.active && user.vip.expiresAt > Date.now();
@@ -28,68 +27,121 @@ function getBossReward(user) {
     return reward;
 }
 
+// ===== НОВЫЙ БАЛАНС =====
 function calculateIncome(user) {
     const buildings = user.buildings || {};
     const citizens = user.citizens || 5;
+    const soldiers = user.soldiers || 0;
     
-    // Нужно рабочих
-    const neededWorkers = 
-        (buildings.mine || 0) * 2 + 
-        (buildings.mint || 0) * 1 +
-        (buildings.quarry || 0) * 3 + 
-        (buildings.field || 0) * 2 + 
-        (buildings.mint_factory || 0) * 2;
+    // ============================================================
+    // 1️⃣ НУЖНО РАБОЧИХ
+    // ============================================================
+    
+    const WORKERS_NEEDED = {
+        hut: 0,
+        farm: 1,
+        mine: 2,
+        mint: 1,
+        market: 1,
+        barracks: 0,
+        field: 2,
+        quarry: 3,
+        mint_factory: 2
+    };
+    
+    let neededWorkers = 0;
+    for (const [key, val] of Object.entries(buildings)) {
+        neededWorkers += (WORKERS_NEEDED[key] || 0) * val;
+    }
+    
+    // ============================================================
+    // 2️⃣ ЭФФЕКТИВНОСТЬ (от жителей)
+    // ============================================================
     
     const workers = Math.min(citizens, neededWorkers);
-    if (workers === 0 || neededWorkers === 0) return { gold: 0, food: 0, coins: 0 };
-
-    // Базовый доход
-    let gold = (buildings.mine || 0) * 7 + (buildings.quarry || 0) * 200; // было 390
-    let food = (buildings.farm || 0) * 2 + (buildings.field || 0) * 250;  // было 410
-    let coins = (buildings.mint || 0) * 6 + (buildings.mint_factory || 0) * 500; // было 840
-
-    // Эффективность
-    const efficiency = workers / neededWorkers;
+    const efficiency = neededWorkers > 0 ? workers / neededWorkers : 1;
+    
+    // ============================================================
+    // 3️⃣ БАЗОВЫЙ ДОХОД (НОВЫЙ БАЛАНС)
+    // ============================================================
+    
+    let gold = (buildings.mine || 0) * 6 + (buildings.quarry || 0) * 75 + (buildings.market || 0) * 10;
+    let food = (buildings.farm || 0) * 3 + (buildings.field || 0) * 100;
+    let coins = (buildings.mint || 0) * 6 + (buildings.mint_factory || 0) * 250;
+    
+    // ============================================================
+    // 4️⃣ ПРИМЕНЯЕМ ЭФФЕКТИВНОСТЬ
+    // ============================================================
+    
     gold = Math.floor(gold * efficiency);
     food = Math.floor(food * efficiency);
     coins = Math.floor(coins * efficiency);
-
-    // ===== БОНУС ДНЯ (ДОБАВЛЯЕМ) =====
-    const todayBonus = getTodayBonus();
     
-    // Бонус на шахты/карьеры
-    if (todayBonus.type === 'mine') {
-        gold = Math.floor(gold * todayBonus.multiplier);
+    // ============================================================
+    // 5️⃣ VIP БОНУС (+20%)
+    // ============================================================
+    
+    if (isVIP(user)) {
+        gold = Math.floor(gold * 1.2);
+        food = Math.floor(food * 1.2);
+        coins = Math.floor(coins * 1.2);
     }
     
-    // Бонус на монеты
-    if (todayBonus.type === 'coins') {
-        coins = Math.floor(coins * todayBonus.multiplier);
+    // ============================================================
+    // 6️⃣ ЖИТЕЛИ И СОЛДАТЫ ЕДЯТ ЕДУ (1 РАЗ ЗА СБОР)
+    // ============================================================
+    
+    // Каждый житель съедает 1 еду за сбор
+    const foodForCitizens = citizens;
+    
+    // Каждый солдат съедает 0.5 еды за сбор
+    const foodForSoldiers = soldiers * 0.5;
+    
+    const totalFoodNeeded = foodForCitizens + foodForSoldiers;
+    
+    // Еда, которая останется после того, как жители и солдаты поедят
+    const foodAfterEat = user.food + food - totalFoodNeeded;
+    
+    // ============================================================
+    // 7️⃣ ГОЛОДНЫЙ ШТРАФ (если еды не хватило)
+    // ============================================================
+    
+    let deserters = 0;
+    let finalFood = food;
+    
+    if (foodAfterEat < 0) {
+        // Не хватило еды — штраф на доход
+        const deficit = Math.abs(foodAfterEat);
+        const penalty = Math.max(0.5, 1 - (deficit / (totalFoodNeeded + 1)) * 0.5);
+        
+        gold = Math.floor(gold * penalty);
+        coins = Math.floor(coins * penalty);
+        
+        // Дезертирство солдат (каждый 3 нехватки = 1 солдат уходит)
+        deserters = Math.floor(deficit / 3) + 1;
+        if (deserters > user.soldiers) deserters = user.soldiers;
+        
+        // Обновляем солдат
+        user.soldiers = Math.max(0, user.soldiers - deserters);
+        
+        // Еды не остаётся
+        finalFood = 0;
+    } else {
+        // Еды хватило — остаток сохраняется
+        finalFood = Math.floor(foodAfterEat);
     }
-
-    // VIP бонус
-    const multiplier = isVIP(user) ? 1.33 : 1;
-    gold = Math.floor(gold * multiplier);
-    food = Math.floor(food * multiplier);
-    coins = Math.floor(coins * multiplier);
-
-    // Голодный штраф
-    if (user.food < citizens) {
-        const foodDeficit = citizens - user.food;
-        const hungerPenalty = Math.max(0.5, 1 - (foodDeficit / citizens) * 0.5);
-        gold = Math.floor(gold * hungerPenalty);
-        food = Math.floor(food * hungerPenalty);
-        coins = Math.floor(coins * hungerPenalty);
-    }
-
-    // Сенат бонус
-    if (buildings.senate > 0) {
-        gold = Math.floor(gold * 1.5);
-        food = Math.floor(food * 1.5);
-        coins = Math.floor(coins * 1.5);
-    }
-
-    return { gold, food, coins };
+    
+    // ============================================================
+    // 8️⃣ ВОЗВРАЩАЕМ
+    // ============================================================
+    
+    return {
+        gold: Math.floor(gold),
+        food: Math.floor(finalFood),
+        coins: Math.floor(coins),
+        deserters: deserters,
+        foodEaten: Math.floor(totalFoodNeeded)
+    };
 }
 
 module.exports = {
