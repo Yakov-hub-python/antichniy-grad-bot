@@ -1,5 +1,8 @@
 const { getUser, saveUser } = require('./storage');
 
+// ============================================================
+// 1️⃣ ТИПЫ КВЕСТОВ
+// ============================================================
 
 const QUEST_TYPES = [
     { type: 'build', target: 5, reward: 100, name: '🏗️ Построй 5 зданий' },
@@ -9,9 +12,13 @@ const QUEST_TYPES = [
     { type: 'boss', target: 2, reward: 150, name: '⚔️ Убей 2 боссов' },
     { type: 'boss', target: 5, reward: 400, name: '⚔️ Убей 5 боссов' },
     { type: 'referral', target: 1, reward: 'vip_3', name: '👥 Приведи друга' },
-    { type: 'spend', target: 500, reward: 80, name: '💸 Потрать 500 золота' }
+    { type: 'spend', target: 500, reward: 80, name: '💸 Потрать 500 золота' },
+    { type: 'spend', target: 1000, reward: 150, name: '💸 Потрать 1000 золота' }
 ];
 
+// ============================================================
+// 2️⃣ ГЕНЕРАЦИЯ КВЕСТА
+// ============================================================
 
 function generateDailyQuest() {
     const random = QUEST_TYPES[Math.floor(Math.random() * QUEST_TYPES.length)];
@@ -22,10 +29,14 @@ function generateDailyQuest() {
         name: random.name,
         progress: 0,
         completed: false,
-        expiresAt: Date.now() + 24 * 60 * 60 * 1000 
+        claimed: false,
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000
     };
 }
 
+// ============================================================
+// 3️⃣ ПОЛУЧИТЬ ТЕКУЩИЙ КВЕСТ
+// ============================================================
 
 function getDailyQuest(user) {
     if (!user.quests) {
@@ -51,6 +62,9 @@ function getDailyQuest(user) {
     return quest;
 }
 
+// ============================================================
+// 4️⃣ ОБНОВИТЬ ПРОГРЕСС КВЕСТА
+// ============================================================
 
 function updateQuestProgress(user, type, amount = 1) {
     if (!user.quests?.daily) return null;
@@ -72,6 +86,9 @@ function updateQuestProgress(user, type, amount = 1) {
     return { completed: false, quest };
 }
 
+// ============================================================
+// 5️⃣ ВЫДАТЬ НАГРАДУ ЗА КВЕСТ
+// ============================================================
 
 function claimQuestReward(user) {
     if (!user.quests?.daily) return null;
@@ -94,7 +111,9 @@ function claimQuestReward(user) {
     return quest.reward;
 }
 
-
+// ============================================================
+// 6️⃣ ЭКСПОРТ
+// ============================================================
 
 module.exports = {
     QUEST_TYPES,

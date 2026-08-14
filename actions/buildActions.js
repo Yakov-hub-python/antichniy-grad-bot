@@ -1,6 +1,7 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { BUILDING_COSTS, BUILDING_NAMES } = require('../config/constants');
-const { getTodayBonus } = require('../utils/dailyBonus');
+const { updateQuestProgress } = require('../utils/quests');
+const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 const city = require('../hears/city');
 
 module.exports = {
@@ -8,17 +9,7 @@ module.exports = {
         const userId = ctx.from.id;
         const type = ctx.match[1];
         const user = getUser(userId);
-        let cost = BUILDING_COSTS[type];
-        
-        // ===== СКИДКА ДНЯ =====
-        const todayBonus = getTodayBonus();
-        if (todayBonus.type === 'build') {
-            cost = {
-                gold: Math.floor(cost.gold * todayBonus.discount),
-                coins: Math.floor(cost.coins * todayBonus.discount),
-                level: cost.level
-            };
-        }
+        const cost = BUILDING_COSTS[type];
 
         // Проверка уровня
         if (user.level < cost.level) {
@@ -36,11 +27,13 @@ module.exports = {
         }
 
         // Списываем ресурсы
+        const spentGold = cost.gold || 0;
+        const spentCoins = cost.coins || 0;
+        
         user.gold -= cost.gold;
         user.coins -= cost.coins;
         user.buildings[type] += 1;
         
-        // Бонус от зданий
         if (type === 'hut') user.citizens += 3;
         if (type === 'barracks') user.soldiers += 2;
         if (type === 'arena') user.soldiers += 5;
@@ -48,6 +41,34 @@ module.exports = {
         // Обновление уровня
         const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
         user.level = totalBuildings + 1;
+
+        // ============================================================
+        // 🎯 КВЕСТ НА ТРАТУ (spend)
+        // ============================================================
+        const totalSpent = spentGold + spentCoins;
+        if (totalSpent > 0) {
+            const questResult = updateQuestProgress(user, 'spend', totalSpent);
+            if (questResult?.completed) {
+                await ctx.reply(
+                    `🎉 КВЕСТ ВЫПОЛНЕН!\n` +
+                    `${questResult.quest.name}\n` +
+                    `🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`
+                );
+                // Автоматически выдаём награду
+                const { claimQuestReward } = require('../utils/quests');
+                claimQuestReward(user);
+            }
+        }
+
+        // ============================================================
+        // 🏆 ДОСТИЖЕНИЯ
+        // ============================================================
+        const newAchievements = checkAchievements(user);
+        for (const ach of newAchievements) {
+            await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
+            claimAchievementReward(user, ach);
+            await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
+        }
 
         // Реферальный бонус
         if (user.level >= 5 && user.referredBy && !user.referralCompleted) {

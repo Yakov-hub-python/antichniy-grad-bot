@@ -34,13 +34,15 @@ function createPromo(code, type, amount, createdBy) {
 function usePromo(code, userId) {
     const db = readDB();
     const promo = db.promocodes?.[code];
+    const user = db.users[String(userId)]; // ← берём из той же БД
 
     if (!promo) return { ok: false, error: '❌ Промокод не найден' };
     if (!promo.active) return { ok: false, error: '❌ Промокод неактивен' };
     if (promo.expiresAt < Date.now()) return { ok: false, error: '❌ Промокод истёк' };
     if (promo.uses >= promo.maxUses) return { ok: false, error: '❌ Промокод использован' };
 
-    const user = getUser(userId);
+    if (!user) return { ok: false, error: '❌ Пользователь не найден' };
+
     if (user.usedPromos?.includes(code)) {
         return { ok: false, error: '❌ Вы уже активировали этот промокод' };
     }
@@ -63,7 +65,7 @@ function usePromo(code, userId) {
     user.usedPromos.push(code);
     promo.uses += 1;
 
-    saveUser(userId, user);
+    // ✅ ПРЯМАЯ ЗАПИСЬ
     writeDB(db);
 
     return { ok: true, reward: `${promo.amount} ${promo.type}` };

@@ -170,7 +170,19 @@ module.exports = (bot) => {
         // Снимаем ресурсы
         if (cost.gold > 0) user.gold -= totalGoldNeeded;
         if (cost.coins > 0) user.coins -= totalCoinsNeeded;
-        
+        const spentGold = cost.gold || 0;
+        const spentCoins = cost.coins || 0;
+        const totalSpent = spentGold + spentCoins;
+
+        // ===== КВЕСТ НА ТРАТУ =====
+        if (totalSpent > 0) {
+            const questResult = updateQuestProgress(user, 'spend', totalSpent);
+            if (questResult?.completed) {
+                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+                const { claimQuestReward } = require('../utils/quests');
+                claimQuestReward(user);
+            }
+        }
         // Строим count зданий
         user.buildings[buildingKey] += count;
         if (buildingKey === 'hut') user.citizens += count * 3;
@@ -229,7 +241,19 @@ module.exports = (bot) => {
         
         if (cost.gold > 0) user.gold -= cost.gold;
         if (cost.coins > 0) user.coins -= cost.coins;
-        
+        const spentGold = cost.gold || 0;
+        const spentCoins = cost.coins || 0;
+        const totalSpent = spentGold + spentCoins;
+
+        // ===== КВЕСТ НА ТРАТУ =====
+        if (totalSpent > 0) {
+            const questResult = updateQuestProgress(user, 'spend', totalSpent);
+            if (questResult?.completed) {
+                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+                const { claimQuestReward } = require('../utils/quests');
+                claimQuestReward(user);
+            }
+        }
         user.buildings[buildingKey] += 1;
         if (buildingKey === 'hut') user.citizens += 3;
         
@@ -339,12 +363,12 @@ module.exports = (bot) => {
     // ============================================================
 
     bot.hears(/атаковать босса/, async (ctx) => {
-        const bossActions = require('./actions/bossActions');
+        const bossActions = require('../actions/bossActions');
         await bossActions.attackPersonal(ctx);
     });
 
     bot.hears(/атаковать глобального/, async (ctx) => {
-        const bossActions = require('./actions/bossActions');
+        const bossActions = require('../actions/bossActions');
         await bossActions.attackGlobal(ctx);
     });
 
@@ -353,31 +377,31 @@ module.exports = (bot) => {
     // ============================================================
 
     bot.hears(['рынок', 'market'], async (ctx) => {
-        await require('./hears/market').showMarketMenu(ctx);
+        await require('../hears/market').showMarketMenu(ctx);
     });
 
     bot.hears(['город', 'city', 'мой город'], async (ctx) => {
-        await require('./hears/city').show(ctx);
+        await require('../hears/city').show(ctx);
     });
 
     bot.hears(['босс', 'boss'], async (ctx) => {
-        await require('./hears/boss').show(ctx);
+        await require('../hears/boss').show(ctx);
     });
 
     bot.hears(['казарма', 'barracks'], async (ctx) => {
-        await require('./hears/barracks').show(ctx);
+        await require('../hears/barracks').show(ctx);
     });
 
     bot.hears(['бонус', 'daily', 'ежедневный'], async (ctx) => {
-        await require('./hears/daily').get(ctx);
+        await require('../hears/daily').get(ctx);
     });
 
     bot.hears(['топ', 'olymp', 'олимп', 'лидеры'], async (ctx) => {
-        await require('./hears/olymp').show(ctx);
+        await require('../hears/olymp').show(ctx);
     });
 
     bot.hears(['друзья', 'referral', 'пригласить'], async (ctx) => {
-        await require('./hears/referral').show(ctx);
+        await require('../hears/referral').show(ctx);
     });
 
     bot.hears(['помощь', 'help', 'команды'], async (ctx) => {

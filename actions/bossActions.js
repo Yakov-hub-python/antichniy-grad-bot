@@ -13,12 +13,12 @@ module.exports = {
         }
 
         const soldiers = getSoldiers(user);
-        const damage = soldiers * 5;
+        const damage = soldiers * 3;
         personal.hp -= damage;
 
         if (personal.hp <= 0) {
             personal.hp = getPersonalBossHP(user);
-            personal.respawnAt = Date.now() + 6 * 60 * 60 * 1000;
+            personal.respawnAt = Date.now() + 3 * 60 * 60 * 1000;
             personal.kills = (personal.kills || 0) + 1;
 
             const reward = getBossReward(user);
@@ -50,7 +50,7 @@ module.exports = {
                 `⚔️ ЛИЧНЫЙ БОСС ПОВЕРЖЕН!\n` +
                 `💰 +${reward} золота!\n` +
                 `🏆 Убийств: ${personal.kills}\n` +
-                `⏳ Следующий через 6 часов.`
+                `⏳ Следующий через 3 часов.`
             );
         } else {
             user.personalBoss = personal;
@@ -73,7 +73,7 @@ module.exports = {
         }
 
         const soldiers = getSoldiers(user);
-        const damage = soldiers * 5;
+        const damage = soldiers * 2;
         global.hp -= damage;
 
         if (!global.participants) global.participants = [];
@@ -92,19 +92,25 @@ module.exports = {
             for (let i = 0; i < top.length; i++) {
                 const player = getUser(top[i].id);
                 if (i === 0) {
-                    player.vip = { active: true, expiresAt: Date.now() + 15 * 24 * 60 * 60 * 1000 };
-                    await ctx.telegram.sendMessage(top[i].id, '🏆 Ты занял 1 место! Получил VIP на 15 дней!');
+                    player.vip = { 
+                        active: true, 
+                        expiresAt: Date.now() + 3 * 24 * 60 * 60 * 1000 
+                    };
+                    player.gold += 1000;
+                    await ctx.telegram.sendMessage(top[i].id, 
+                        '🏆 Ты занял 1 место!\n👑 VIP на 3 дня\n💰 +3000 золота!'
+                    );
                 } else {
-                    player.gold += 50;
-                    await ctx.telegram.sendMessage(top[i].id, `🥈 ${i+1} место! +50 золота!`);
+                    player.gold += 500;
+                    await ctx.telegram.sendMessage(top[i].id, 
+                        `🥈 ${i+1} место! +2000 золота!`
+                    );
                 }
                 saveUser(top[i].id, player);
             }
-
-            const share = Math.floor(5000 / (global.participants.length || 1));
             for (const p of global.participants) {
                 const player = getUser(p.id);
-                player.gold += share;
+                player.gold += 1000;
                 saveUser(p.id, player);
             }
 
@@ -115,7 +121,7 @@ module.exports = {
             db.globalBoss = global;
             writeDB(db);
 
-            await ctx.reply(`🌍 ГЛОБАЛЬНЫЙ БОСС ПОВЕРЖЕН!\n💰 Все участники получили +${share} золота!`);
+            await ctx.reply(`🌍 ГЛОБАЛЬНЫЙ БОСС ПОВЕРЖЕН!`);
         } else {
             db.globalBoss = global;
             writeDB(db);

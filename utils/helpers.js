@@ -14,16 +14,14 @@ function getSoldiers(user) {
 }
 
 function getPersonalBossHP(user) {
-    return 5000 + (user.level - 1) * 1000;
+    return 1000 + (user.level - 1) * 1500; // ✅ Новый баланс
 }
 
 function getBossReward(user) {
-    const bossHp = getPersonalBossHP(user);
-    const soldiers = getSoldiers(user);
-    const damage = soldiers * 5 || 1;
-    const hitsToKill = Math.ceil(bossHp / damage);
-    let reward = 50 + hitsToKill * 10;
-    reward = Math.max(100, Math.min(5000, reward));
+    const baseReward = 100 + user.level * 20;
+    const soldierBonus = Math.floor((user.soldiers || 0) / 10) * 10;
+    let reward = baseReward + soldierBonus;
+    reward = Math.max(200, Math.min(8000, reward));
     return reward;
 }
 

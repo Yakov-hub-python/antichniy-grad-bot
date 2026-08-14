@@ -89,6 +89,13 @@ async function buyResource(ctx, resource) {
 
     await ctx.answerCbQuery(`✅ Куплено ${amount} ${resource} за ${cost}💰`);
     await ctx.reply(`✅ Куплено ${amount} ${resource} за ${cost} золота.`);
+    const spent = cost;
+    const questResult = updateQuestProgress(user, 'spend', spent);
+    if (questResult?.completed) {
+        await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+        const { claimQuestReward } = require('../utils/quests');
+        claimQuestReward(user);
+    }
     await showMarketMenu(ctx);
 }
 

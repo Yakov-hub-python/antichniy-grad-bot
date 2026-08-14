@@ -33,22 +33,6 @@ function writeDB(data) {
     }
 }
 
-// ===== НОВАЯ ФУНКЦИЯ МИГРАЦИИ =====
-function migrateUser(user) {
-    let needSave = false;
-    
-    // Проверяем и добавляем новые здания
-    const newBuildings = ['field', 'quarry', 'mint_factory'];
-    for (const building of newBuildings) {
-        if (user.buildings[building] === undefined) {
-            user.buildings[building] = 0;
-            needSave = true;
-        }
-    }
-    
-    return needSave;
-}
-
 function getUser(id) {
     const db = readDB();
     let needSave = false;
