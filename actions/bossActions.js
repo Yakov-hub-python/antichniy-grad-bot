@@ -1,7 +1,13 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { getSoldiers, getPersonalBossHP, getBossReward } = require('../utils/helpers');
+const { updateQuestProgress } = require('../utils/quests');
+const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 
 module.exports = {
+    // ============================================================
+    // 1️⃣ ЛИЧНЫЙ БОСС
+    // ============================================================
+    
     attackPersonal: async (ctx) => {
         const userId = ctx.from.id;
         const user = getUser(userId);
@@ -32,20 +38,21 @@ module.exports = {
 
             user.personalBoss = personal;
             saveUser(userId, user);
-            const { updateQuestProgress } = require('../utils/quests');
-            const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 
+            // Квест
             const questResult = updateQuestProgress(user, 'boss');
             if (questResult?.completed) {
                 await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\nНаграда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
             }
 
+            // Достижения
             const newAchievements = checkAchievements(user);
             for (const ach of newAchievements) {
                 await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
                 claimAchievementReward(user, ach);
                 await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
             }
+
             await ctx.reply(
                 `⚔️ ЛИЧНЫЙ БОСС ПОВЕРЖЕН!\n` +
                 `💰 +${reward} золота!\n` +
@@ -61,6 +68,10 @@ module.exports = {
             );
         }
     },
+
+    // ============================================================
+    // 2️⃣ ГЛОБАЛЬНЫЙ БОСС
+    // ============================================================
 
     attackGlobal: async (ctx) => {
         const userId = ctx.from.id;
@@ -89,6 +100,7 @@ module.exports = {
             const sorted = global.participants.sort((a, b) => b.damage - a.damage);
             const top = sorted.slice(0, 3);
 
+            // ===== НАГРАДЫ ТОП-3 =====
             for (let i = 0; i < top.length; i++) {
                 const player = getUser(top[i].id);
                 if (i === 0) {
@@ -98,30 +110,41 @@ module.exports = {
                     };
                     player.gold += 1000;
                     await ctx.telegram.sendMessage(top[i].id, 
-                        '🏆 Ты занял 1 место!\n👑 VIP на 3 дня\n💰 +3000 золота!'
+                        '🏆 Ты занял 1 место!\n👑 VIP на 3 дня\n💰 +1000 золота!'
                     );
                 } else {
                     player.gold += 500;
                     await ctx.telegram.sendMessage(top[i].id, 
-                        `🥈 ${i+1} место! +2000 золота!`
+                        `🥈 ${i+1} место! +500 золота!`
                     );
                 }
+                // ✅ СОХРАНЯЕМ КАЖДОГО ИЗ ТОП-3
                 saveUser(top[i].id, player);
             }
+
+            // ===== ВСЕМ УЧАСТНИКАМ =====
+            const share = Math.floor(5000 / (global.participants.length || 1));
             for (const p of global.participants) {
                 const player = getUser(p.id);
-                player.gold += 1000;
+                player.coins += share;
+                // ✅ СОХРАНЯЕМ КАЖДОГО УЧАСТНИКА
                 saveUser(p.id, player);
             }
 
-            const userCount = Object.keys(db.users).length;
-            global.hp = 1000 * Math.floor(userCount / 2) || 5000;
+            // ===== СОЗДАЁМ НОВОГО БОССА =====
+            const userCount = Object.keys(db.users || {}).length;
+            global.hp = 5000 + 1000 * Math.floor(userCount / 2) || 5000;
             global.maxHp = global.hp;
+            global.active = true;
             global.participants = [];
             db.globalBoss = global;
             writeDB(db);
 
-            await ctx.reply(`🌍 ГЛОБАЛЬНЫЙ БОСС ПОВЕРЖЕН!`);
+            await ctx.reply(
+                `🌍 ГЛОБАЛЬНЫЙ БОСС ПОВЕРЖЕН!\n` +
+                `🪙 Все участники получили +${share} монет!\n` +
+                `⏳ Новый босс уже появился!`
+            );
         } else {
             db.globalBoss = global;
             writeDB(db);
