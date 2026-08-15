@@ -66,10 +66,16 @@ module.exports = {
         const userId = ctx.from.id;
         const user = getUser(userId);
         const db = readDB();
-        const global = db.globalBoss || { hp: 5000, maxHp: 5000, active: true, participants: [] };
+        const global = db.globalBoss || { 
+            hp: 5000,
+            maxHp: 5000,
+            active: true, 
+            participants: [] 
+        };
 
         if (!global.active) {
-            return ctx.reply('💤 Глобальный босс повержен. Следующий в 12:00 или 18:00.');
+            return ctx.reply('💤 Глобальный босс повержен. Следующий в 00:00,\
+                6:00, 12:00 или 18:00');
         }
 
         const soldiers = getSoldiers(user);
@@ -96,12 +102,12 @@ module.exports = {
                         active: true, 
                         expiresAt: Date.now() + 3 * 24 * 60 * 60 * 1000 
                     };
-                    player.gold += 1000;
+                    player.gold += 3000;
                     await ctx.telegram.sendMessage(top[i].id, 
                         '🏆 Ты занял 1 место!\n👑 VIP на 3 дня\n💰 +3000 золота!'
                     );
                 } else {
-                    player.gold += 500;
+                    player.gold += 2000;
                     await ctx.telegram.sendMessage(top[i].id, 
                         `🥈 ${i+1} место! +2000 золота!`
                     );
