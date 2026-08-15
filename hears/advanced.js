@@ -1,5 +1,6 @@
 const { getUser, saveUser } = require('../utils/storage');
 const { BUILDING_COSTS, BUILDING_NAMES } = require('../config/constants');
+const { getSoldiers } = require('../utils/helpers');
 
 // ============================================================
 // 1️⃣ ПАРСИНГ КОМАНД
@@ -289,7 +290,22 @@ async function handleAdvancedCommand(ctx) {
         return require('./boss').show(ctx);
     }
     if (parsed.action === 'barracks_show') {
-        return require('./barracks').show(ctx);
+        const user = getUser(ctx.from.id);
+        const soldiers = getSoldiers(user);
+        await ctx.reply(
+            `🪖 КАЗАРМА\n\n` +
+            `🪖 Солдаты: ${soldiers}\n` + 
+            `💰 Цена: 1 воин = 6 монет\n\n` +
+            `⚔️ Каждый солдат даёт 5 урона боссам.`,
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'Нанять воинов', callback_data: 'hire_warriors_1' }],
+                        [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+                    ]
+                }
+            }
+        );
     }
     if (parsed.action === 'daily_show') {
         return require('./daily').get(ctx);

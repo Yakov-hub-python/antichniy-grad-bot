@@ -37,19 +37,7 @@ log('START', '🚀 Бот запущен');
 
 bot.on('text', async (ctx) => {
     const text = ctx.message.text;
-    
-    // Пропускаем команды (начинаются с /)
     if (text.startsWith('/')) return;
-    
-    // Пропускаем стандартные кнопки
-    const buttons = [
-        'ℹ️ О боте', '🏙️ Город', '👥 Пригласить друга',
-        '🎁 Ежедневный бонус', '🛒 Магазин', '⚔️ Босс',
-        '🏆 Олимп', '🪖 Казарма'
-    ];
-    if (buttons.includes(text)) return;
-    
-    // Пробуем обработать как продвинутую команду
     await handleAdvancedCommand(ctx);
 });
 

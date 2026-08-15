@@ -119,31 +119,35 @@ module.exports = (bot) => {
     // ===== /HELP =====
     bot.command('help', async (ctx) => {
         await ctx.reply(
-            `📖 СПИСОК КОМАНД:\n\n` +
+            `📖 СПИСОК КОМАНД\n\n` +
             `🎮 ИГРОВЫЕ:\n` +
             `/start — начать игру\n` +
-            `/city — город\n` +
+            `/menu — главное меню\n` +
+            `/city — город и статистика\n` +
             `/build — строительство\n` +
             `/income — собрать доход\n` +
             `/daily — ежедневный бонус\n` +
             `/boss — боссы\n` +
-            `/olymp — топ-10\n` +
+            `/olymp — топ-10 игроков\n` +
             `/profile — мой профиль\n\n` +
             `🪖 АРМИЯ:\n` +
             `/barracks — казарма\n` +
-            `/hire 10 — нанять воинов\n\n` +
+            `/hire <количество> — нанять воинов\n\n` +
             `👥 РЕФЕРАЛЫ:\n` +
             `/referral — ссылка для друзей\n\n` +
             `🏪 ТОРГОВЛЯ:\n` +
             `/market — рынок\n` +
-            `/sell food 10 — продать\n` +
-            `/buy food 10 — купить\n\n` +
+            `/sell <ресурс> <кол-во> — продать\n` +
+            `/buy <ресурс> <кол-во> — купить\n\n` +
             `🎁 ПРОМОКОДЫ:\n` +
-            `/promo HELLO2026 — активировать код\n\n` +
+            `/promo <код> — активировать промокод\n\n` +
+            `🎯 КВЕСТЫ И ДОСТИЖЕНИЯ:\n` +
+            `/quests — текущий квест\n` +
+            `/achievements — все достижения\n\n` +
             `🛠 ОСТАЛЬНОЕ:\n` +
             `/help — помощь\n` +
             `/menu — главное меню\n\n` +
-            `📢 Канал: @antichniy_grad_channel\n` +
+            `📢 Канал: @antichniy_grad\n` +
             `💬 Чат: @antichniy_grad_chat`
         );
     });
@@ -202,7 +206,7 @@ module.exports = (bot) => {
     bot.command('market', require('../hears/market').showMarketMenu);
 
     // ===== /SHOP =====
-    bot.command('shop', require('../hears/shop').show);
+    // bot.command('shop', require('../hears/shop').show);
 
     // ===== /PROFILE =====
     bot.command('profile', async (ctx) => {

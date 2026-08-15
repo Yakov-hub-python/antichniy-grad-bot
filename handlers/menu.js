@@ -1,8 +1,5 @@
 const { getUser } = require('../utils/storage');
-
-// ============================================================
-// 1️⃣ ШАПКА С РЕСУРСАМИ
-// ============================================================
+const { getSoldiers } = require('../utils/helpers');
 
 function getHeader(user) {
     const gold = user.gold || 0;
@@ -12,22 +9,16 @@ function getHeader(user) {
     const soldiers = user.soldiers || 0;
     
     return `🏛️ ГЛАВНАЯ ПЛОЩАДЬ\n` +
-           `💰 ${gold} | 🪙 ${coins} | 🍖 ${food} | 👥 ${citizens} | 🪖 ${soldiers}\n` +
-           `─────────────────`;
+        `💰 ${gold} | 🪙 ${coins} | 🍖 ${food} | 👥 ${citizens} | 🪖 ${soldiers}\n` +
+        `─────────────────`;
 }
 
-// ============================================================
-// 2️⃣ КВЕСТ-ТРЕКЕР (ДЛЯ НОВИЧКОВ)
-// ============================================================
-
 function getQuestTracker(user) {
-    // Если есть активный квест
     if (user.quests && user.quests.length > 0) {
         const quest = user.quests[0];
         return `\n🎯 ${quest.name}\n📊 ${quest.progress}/${quest.target}\n`;
     }
     
-    // Если игрок новый (меньше 3 построек)
     const totalBuildings = Object.values(user.buildings || {}).reduce((a, b) => a + b, 0);
     if (totalBuildings < 3) {
         return `\n🎯 Построй 3 здания\n📊 ${totalBuildings}/3\n`;
@@ -36,27 +27,19 @@ function getQuestTracker(user) {
     return '';
 }
 
-// ============================================================
-// 3️⃣ ГЛАВНОЕ МЕНЮ
-// ============================================================
-
 async function showMainMenu(ctx) {
     const userId = ctx.from.id;
     const user = await getUser(userId);
 
     let text = getHeader(user);
-    // text += getQuestTracker(user);
     text += `\n👇 Выбери действие:`;
-    
 
     const buttons = [];
-    
 
     const totalBuildings = Object.values(user.buildings || {}).reduce((a, b) => a + b, 0);
     buttons.push([
         { text: `🏙️ Город (${totalBuildings})`, callback_data: 'city_show' }
     ]);
-    
 
     if (user.soldiers > 0) {
         buttons.push([
@@ -67,18 +50,15 @@ async function showMainMenu(ctx) {
             { text: `⚔️ Босс (найми солдат!)`, callback_data: 'barracks_show' }
         ]);
     }
-    
 
     buttons.push([
         { text: '🏪 Рынок', callback_data: 'market_show' }
     ]);
-    
 
     buttons.push([
         { text: '👥 Друзья', callback_data: 'referral_show' },
         { text: '🎁 Бонус', callback_data: 'daily_show' }
     ]);
-    
 
     const lastIncome = user.lastIncome || 0;
     const now = Date.now();
@@ -98,23 +78,29 @@ async function showMainMenu(ctx) {
             { text: `⏳ Доход через ${timeText}`, callback_data: 'collect_income' }
         ]);
     }
-    
 
     buttons.push([
         { text: '🪖 Казарма', callback_data: 'barracks_show' }
     ]);
-    
 
     buttons.push([
         { text: '🏆 Олимп', callback_data: 'olymp_show' },
         { text: 'ℹ️ О боте', callback_data: 'about_show' }
     ]);
-    
 
+    // ===== ✅ ДОБАВЛЯЕМ REPLY-КЛАВИАТУРУ =====
+    const replyKeyboard = {
+        keyboard: [
+            ['🏙️ Город', '⚔️ Босс'],
+            ['🏪 Рынок', '🪖 Казарма'],
+            ['👥 Пригласить друга', '🎁 Ежедневный бонус'],
+            ['🏆 Олимп', 'ℹ️ О боте']
+        ],
+        resize_keyboard: true
+    };
     await ctx.reply(text, {
         reply_markup: {
-            inline_keyboard: buttons,
-            resize_keyboard: true
+            inline_keyboard: buttons
         }
     });
 }

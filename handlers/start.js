@@ -81,7 +81,8 @@ module.exports = async (ctx) => {
         `💰 Золото: ${user.gold}\n` +
         `🏗️ Уровень города: ${user.level}\n` +
         `👥 Друзей: ${user.referrals ? user.referrals.length : 0}\n\n` +
-        `Строй, воюй и приводи друзей!`
+        `Строй, воюй и приводи друзей!`,
+        MAIN_MENU
     );
     await showMainMenu(ctx);
 };

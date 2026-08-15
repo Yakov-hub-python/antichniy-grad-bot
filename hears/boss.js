@@ -22,7 +22,7 @@ module.exports = {
 
         const globalStatus = global.active
             ? `🔥 Активен! HP: ${global.hp}/${global.maxHp}`
-            : `💤 Повержен. Следующий в 12:00 или 18:00`;
+            : `💤 Повержен. Следующий в 00:00, 6:00, 12:00 или 18:00`;
 
         await ctx.reply(
             `⚔️ БОССЫ\n\n` +
