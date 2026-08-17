@@ -73,7 +73,9 @@ function getUser(id) {
                 respawnAt: 0,
                 kills: 0
             },
-            username: 'unknown'
+            username: 'unknown',
+            first_name: 'Игрок',
+            nickname: 'Игрок'
         };
         needSave = true;
     } else {

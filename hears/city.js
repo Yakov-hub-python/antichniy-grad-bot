@@ -11,7 +11,7 @@ module.exports = {
         const foodStatus = user.food >= user.citizens ? '✅ Сыты' : '❌ Голодают (-20%)';
 
         await ctx.reply(
-            `🏙️ ТВОЙ ГОРОД\n\n` +
+            `${user.nickname || 'Игрок'},твой город\n\n` +
             `💰 Золото: ${user.gold}\n` +
             `🪙 Монеты: ${user.coins || 0}\n` +
             `👥 Жители: ${user.citizens}\n` +

@@ -116,12 +116,12 @@ module.exports = {
                     };
                     player.gold += 3000;
                     await ctx.telegram.sendMessage(top[i].id, 
-                        '🏆 Ты занял 1 место!\n👑 VIP на 3 дня\n💰 +1000 золота!'
+                        '🏆 Ты занял 1 место!\n👑 VIP на 3 дня\n💰 +3000 золота!'
                     );
                 } else {
                     player.gold += 2000;
                     await ctx.telegram.sendMessage(top[i].id, 
-                        `🥈 ${i+1} место! +500 золота!`
+                        `🥈 ${i+1} место! +2000 золота!`
                     );
                 }
                 // ✅ СОХРАНЯЕМ КАЖДОГО ИЗ ТОП-3
@@ -151,6 +151,12 @@ module.exports = {
                 `🪙 Все участники получили +${share} монет!\n` +
                 `⏳ Новый босс уже появился!`
             );
+            const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
+            const questResult = updateQuestProgress(user, 'boss');
+            if (questResult?.completed) {
+                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+                claimQuestReward(user);
+            }
         } else {
             db.globalBoss = global;
             writeDB(db);

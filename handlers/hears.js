@@ -175,6 +175,11 @@ module.exports = (bot) => {
                 claimQuestReward(user);
             }
         }
+        const questResult = updateQuestProgress(user, 'build', count || 1);
+        if (questResult?.completed) {
+            await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+            claimQuestReward(user);
+        }
         
         user.buildings[buildingKey] += count;
         if (buildingKey === 'hut') user.citizens += count * 3;
@@ -183,7 +188,8 @@ module.exports = (bot) => {
         user.level = totalBuildings + 1;
         
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ ${count} ${BUILDING_NAMES[buildingKey]} построено! Уровень: ${user.level}`);
+        await ctx.reply(`✅ ${count} ${BUILDING_NAMES[buildingKey]} построено!\
+            Уровень: ${user.level}`);
     });
 
     bot.hears(/построить/, async (ctx) => {
@@ -241,7 +247,11 @@ module.exports = (bot) => {
                 claimQuestReward(user);
             }
         }
-        
+        const questResult = updateQuestProgress(user, 'build', count || 1);
+        if (questResult?.completed) {
+            await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+            claimQuestReward(user);
+        }
         user.buildings[buildingKey] += 1;
         if (buildingKey === 'hut') user.citizens += 3;
         
@@ -417,24 +427,54 @@ module.exports = (bot) => {
 
     bot.hears(['помощь', 'help', 'команды'], async (ctx) => {
         await ctx.reply(
-            '📖 СПИСОК КОМАНД\n\n' +
-            'Текстовые команды:\n' +
-            '• продать еда 10\n' +
-            '• продать монеты 5\n' +
-            '• купить еда 10\n' +
-            '• купить монеты 5\n' +
-            '• построить хижину\n' +
-            '• нанять 10\n' +
-            '• атаковать босса\n' +
-            '• рынок / город / босс / бонус / топ\n\n' +
-            'Кнопки в меню для быстрого доступа!'
+            `📖 СПИСОК КОМАНД\n\n` +
+
+            `🎮 ИГРОВЫЕ:\n` +
+            `/start — начать игру\n` +
+            `/menu — главное меню\n` +
+            `/city — город и статистика\n` +
+            `/build — строительство\n` +
+            `/income — собрать доход\n` +
+            `/daily — ежедневный бонус\n` +
+            `/boss — боссы\n` +
+            `/olymp — топ-10 игроков\n` +
+            `/profile — мой профиль\n\n` +
+
+            `🪖 АРМИЯ:\n` +
+            `/barracks — казарма\n` +
+            `/hire <количество> — нанять воинов\n\n` +
+
+            `👥 РЕФЕРАЛЫ:\n` +
+            `/referral — ссылка для друзей\n\n` +
+
+            `🏪 ТОРГОВЛЯ:\n` +
+            `/market — рынок\n` +
+            `/sell <ресурс> <кол-во> — продать\n` +
+            `/buy <ресурс> <кол-во> — купить\n\n` +
+
+            `🎁 ПРОМОКОДЫ:\n` +
+            `/promo <код> — активировать промокод\n\n` +
+
+            `🎯 КВЕСТЫ И ДОСТИЖЕНИЯ:\n` +
+            `/quests — текущий квест\n` +
+            `/achievements — все достижения\n\n` +
+
+            `👤 ПРОФИЛЬ:\n` +
+            `/setnickname <ник> — установить ник в игре\n\n` +
+
+            `🛠 ОСТАЛЬНОЕ:\n` +
+            `/help — помощь\n` +
+            `/menu — главное меню\n\n` +
+
+            `📢 Канал: @antichniy_grad\n` +
+            `💬 Чат: @antichniy_grad_chat`
         );
     });
 
     bot.hears(['о боте', 'инфо'], async (ctx) => {
         await ctx.reply(
             'ℹ️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n' +
-            'Версия: 1.3.5\n' +
+            'Версия: 1.4.2\n' +
             'Разработчик: @DEDAYSON\n\n' +
             'Экономическая стратегия в Telegram.\n' +
             'Строй, воюй, приводи друзей!'
@@ -495,7 +535,7 @@ module.exports = (bot) => {
     bot.hears('ℹ️ О боте', async (ctx) => {
         await ctx.reply(
             'ℹ️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n' +
-            'Версия: 1.3.5\n' +
+            'Версия: 1.4.2\n' +
             'Разработчик: @DEDAYSON\n\n' +
             'Экономическая стратегия в Telegram.\n' +
             'Строй, воюй, приводи друзей!'

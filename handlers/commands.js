@@ -120,6 +120,7 @@ module.exports = (bot) => {
     bot.command('help', async (ctx) => {
         await ctx.reply(
             `📖 СПИСОК КОМАНД\n\n` +
+
             `🎮 ИГРОВЫЕ:\n` +
             `/start — начать игру\n` +
             `/menu — главное меню\n` +
@@ -130,23 +131,33 @@ module.exports = (bot) => {
             `/boss — боссы\n` +
             `/olymp — топ-10 игроков\n` +
             `/profile — мой профиль\n\n` +
+
             `🪖 АРМИЯ:\n` +
             `/barracks — казарма\n` +
             `/hire <количество> — нанять воинов\n\n` +
+
             `👥 РЕФЕРАЛЫ:\n` +
             `/referral — ссылка для друзей\n\n` +
+
             `🏪 ТОРГОВЛЯ:\n` +
             `/market — рынок\n` +
             `/sell <ресурс> <кол-во> — продать\n` +
             `/buy <ресурс> <кол-во> — купить\n\n` +
+
             `🎁 ПРОМОКОДЫ:\n` +
             `/promo <код> — активировать промокод\n\n` +
+
             `🎯 КВЕСТЫ И ДОСТИЖЕНИЯ:\n` +
             `/quests — текущий квест\n` +
             `/achievements — все достижения\n\n` +
+
+            `👤 ПРОФИЛЬ:\n` +
+            `/setnickname <ник> — установить ник в игре\n\n` +
+
             `🛠 ОСТАЛЬНОЕ:\n` +
             `/help — помощь\n` +
             `/menu — главное меню\n\n` +
+
             `📢 Канал: @antichniy_grad\n` +
             `💬 Чат: @antichniy_grad_chat`
         );
@@ -213,6 +224,7 @@ module.exports = (bot) => {
         const user = getUser(ctx.from.id);
         await ctx.reply(
             `🪪 ПРОФИЛЬ\n\n` +
+            `👤 Ник: ${user.nickname || 'Игрок'}\n` +
             `💰 Золото: ${user.gold}\n` +
             `🍖 Еда: ${user.food || 0}\n` +
             `🪙 Монеты: ${user.coins || 0}\n` +
@@ -286,6 +298,35 @@ module.exports = (bot) => {
         
         await ctx.reply(text);
     });
+    // ===== УСТАНОВИТЬ НИК =====
+    bot.command('setnickname', async (ctx) => {
+        const userId = ctx.from.id;
+        const user = getUser(userId);
+        const args = ctx.message.text.split(' ');
+
+        if (args.length < 2) {
+            return ctx.reply('❌ Используй: /setnickname <новый ник>\nПример: /setnickname Яша');
+        }
+
+        const newNick = args.slice(1).join(' ').trim();
+
+        // Проверки
+        if (newNick.length > 20) {
+            return ctx.reply('❌ Ник не может быть длиннее 20 символов');
+        }
+        if (newNick.length < 2) {
+            return ctx.reply('❌ Ник должен быть минимум 2 символа');
+        }
+        if (/[^a-zA-Zа-яА-Я0-9_]/.test(newNick)) {
+            return ctx.reply('❌ Ник может содержать только буквы, цифры и _');
+        }
+
+        user.nickname = newNick;
+        saveUser(userId, user);
+
+        await ctx.reply(`✅ Твой ник изменён на: ${newNick}`);
+    });
+
     // ============================================
     // ========== АДМИН-КОМАНДЫ ==========
     // ============================================
@@ -298,24 +339,30 @@ module.exports = (bot) => {
 
         await ctx.reply(
             `👑 АДМИН-ПАНЕЛЬ\n\n` +
-            `📌 Команды:\n` +
-            `/stats — статистика бота\n` +
-            `/give_gold @user 100\n` +
-            `/give_vip @user 7\n` +
-            `/say текст\n` +
-            `/list_users\n` +
-            `/delete_user @user\n` +
-            `/reset_user @user\n` +
-            `/backup — скачать бэкап\n` +
-            `/restore — восстановить БД\n\n` +
+
+            `📊 СТАТИСТИКА:\n` +
+            `/stats — статистика бота\n\n` +
+
+            `🎮 УПРАВЛЕНИЕ ИГРОКАМИ:\n` +
+            `/give @user <ресурс> <кол-во> — выдать ресурс\n` +
+            `   (gold, coins, food, soldiers, vip)\n` +
+            `/give_all <ресурс> <кол-во> — выдать всем\n` +
+            `/list_users — список всех игроков\n` +
+            `/delete_user @user — удалить игрока\n` +
+            `/reset_user @user — сбросить игрока\n\n` +
+
+            `📢 РАССЫЛКА:\n` +
+            `/say текст — сообщение всем игрокам\n\n` +
+
             `🎁 ПРОМОКОДЫ:\n` +
-            `/newpromo gold 100 HELLO\n` +
-            `/removepromo HELLO\n` +
-            `/promolist\n\n` +
-            `📢 КАНАЛ И ЧАТ:\n` +
-            `Канал: @antichniy_grad_channel\n` +
-            `Чат: @antichniy_grad_chat`
-        );
+            `/newpromo gold 100 HELLO — создать\n` +
+            `/removepromo HELLO — удалить\n` +
+            `/promolist — список промокодов\n\n` +
+
+            `💾 БЭКАП:\n` +
+            `/backup — скачать бэкап БД\n` +
+            `/restore — восстановить БД\n\n`
+        )
     });
 
     // ===== /STATS — СТАТИСТИКА БОТА =====
@@ -352,87 +399,110 @@ module.exports = (bot) => {
     });
 
     // ===== /GIVE_GOLD =====
-    bot.command('give_gold', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) {
-            console.log(`⛔ [GIVE_GOLD] Доступ запрещен для ${ctx.from.id}`);
-            return;
-        }
-        
+    bot.command('give', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Только для админа');
+
         const args = ctx.message.text.split(' ');
-        if (args.length < 3) {
-            return ctx.reply('❌ Используйте: /give_gold @user 100');
+        if (args.length < 4) {
+            return ctx.reply(
+                '❌ Используй: /give @user <ресурс> <количество>\n\n' +
+                '📦 Ресурсы: gold, coins, food, soldiers, vip\n' +
+                'Пример: /give @DEDAYSON gold 1000'
+            );
         }
-        
+
         const username = args[1].replace('@', '');
-        const amount = parseInt(args[2]);
+        const resource = args[2].toLowerCase();
+        const amount = parseInt(args[3]);
+
         if (isNaN(amount) || amount <= 0) {
-            return ctx.reply('❌ Укажите положительное число.');
+            return ctx.reply('❌ Количество должно быть положительным числом');
         }
-        
+
+        const validResources = ['gold', 'coins', 'food', 'soldiers', 'vip'];
+        if (!validResources.includes(resource)) {
+            return ctx.reply(`❌ Неизвестный ресурс. Доступно: ${validResources.join(', ')}`);
+        }
+
         const db = readDB();
-        let found = false;
-        let userId = null;
-        
+        let targetId = null;
         for (const id in db.users) {
             if (db.users[id].username === username) {
-                db.users[id].gold += amount;
-                userId = id;
-                found = true;
+                targetId = id;
                 break;
             }
         }
-        
-        if (!found) {
-            console.log(`❌ [GIVE_GOLD] Игрок @${username} не найден`);
-            return ctx.reply(`❌ Игрок @${username} не найден`);
-        }
-        
-        writeDB(db);
-        console.log(`✅ [GIVE_GOLD] @${username} (${userId}) получил ${amount} золота от ${ctx.from.id}`);
-        await ctx.reply(`✅ @${username} получил ${amount} золота`);
-    });
 
-    // ===== /GIVE_VIP =====
-    bot.command('give_vip', async (ctx) => {
-        if (!isAdmin(ctx.from.id)) {
-            console.log(`⛔ [GIVE_VIP] Доступ запрещен для ${ctx.from.id}`);
-            return;
+        if (!targetId) return ctx.reply(`❌ Игрок @${username} не найден`);
+
+        const user = db.users[targetId];
+
+        switch (resource) {
+            case 'gold':
+                user.gold += amount;
+                break;
+            case 'coins':
+                user.coins += amount;
+                break;
+            case 'food':
+                user.food += amount;
+                break;
+            case 'soldiers':
+                user.soldiers += amount;
+                break;
+            case 'vip':
+                user.vip = {
+                    active: true,
+                    expiresAt: Date.now() + amount * 24 * 60 * 60 * 1000
+                };
+                break;
         }
-        
+
+        writeDB(db);
+
+        const rewardText = resource === 'vip' ? `${amount} дней VIP` : `${amount} ${resource}`;
+        await ctx.reply(`✅ @${username} получил ${rewardText}`);
+    });
+    bot.command('give_all', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Только для админа');
+
         const args = ctx.message.text.split(' ');
         if (args.length < 3) {
-            return ctx.reply('❌ Используйте: /give_vip @user 7');
+            return ctx.reply(
+                '❌ Используй: /give_all <ресурс> <количество>\n\n' +
+                'Пример: /give_all gold 100'
+            );
         }
-        
-        const username = args[1].replace('@', '');
-        const days = parseInt(args[2]);
-        if (isNaN(days) || days <= 0) {
-            return ctx.reply('❌ Укажите положительное число дней.');
-        }
-        
-        const db = readDB();
-        let found = false;
-        let userId = null;
-        
-        for (const id in db.users) {
-            if (db.users[id].username === username) {
-                db.users[id].vip = { active: true, expiresAt: Date.now() + days * 24 * 60 * 60 * 1000 };
-                userId = id;
-                found = true;
-                break;
-            }
-        }
-        
-        if (!found) {
-            console.log(`❌ [GIVE_VIP] Игрок @${username} не найден`);
-            return ctx.reply(`❌ Игрок @${username} не найден`);
-        }
-        
-        writeDB(db);
-        console.log(`✅ [GIVE_VIP] @${username} (${userId}) получил VIP на ${days} дней от ${ctx.from.id}`);
-        await ctx.reply(`✅ @${username} получил VIP на ${days} дней`);
-    });
 
+        const resource = args[1].toLowerCase();
+        const amount = parseInt(args[2]);
+
+        if (isNaN(amount) || amount <= 0) {
+            return ctx.reply('❌ Количество должно быть положительным числом');
+        }
+
+        const validResources = ['gold', 'coins', 'food', 'soldiers'];
+        if (!validResources.includes(resource)) {
+            return ctx.reply(`❌ Неизвестный ресурс. Доступно: ${validResources.join(', ')}`);
+        }
+
+        const db = readDB();
+        let count = 0;
+
+        for (const id in db.users) {
+            const user = db.users[id];
+            switch (resource) {
+                case 'gold': user.gold += amount; break;
+                case 'coins': user.coins += amount; break;
+                case 'food': user.food += amount; break;
+                case 'soldiers': user.soldiers += amount; break;
+            }
+            count++;
+        }
+
+        writeDB(db);
+        await ctx.reply(`✅ ${count} игроков получили ${amount} ${resource}`);
+    });
     // ===== /SAY =====
     bot.command('say', async (ctx) => {
         if (!isAdmin(ctx.from.id)) {

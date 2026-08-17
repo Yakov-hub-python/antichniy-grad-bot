@@ -102,7 +102,7 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         await ctx.reply(
             'ℹ️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n' +
-            'Версия: 1.3.5\n' +
+            'Версия: 1.4.2\n' +
             'Разработчик: @DEDAYSON\n\n' +
             'Экономическая стратегия в Telegram.\n' +
             'Строй, воюй, приводи друзей!'

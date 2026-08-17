@@ -84,7 +84,12 @@ module.exports = {
                 await ctx.telegram.sendMessage(user.referredBy, `🎉 Твой друг @${user.username} достиг 5 уровня! Вы получили VIP на ${vipDays} дней!`);
             } catch (err) {}
         }
-
+        const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
+        const questResult = updateQuestProgress(user, 'build', 1);
+        if (questResult?.completed) {
+            await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+            claimQuestReward(user);
+        }
         saveUser(userId, user);
         await ctx.reply(`✅ ${BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`);
         await city.show(ctx);

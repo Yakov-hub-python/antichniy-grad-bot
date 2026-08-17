@@ -9,6 +9,10 @@ module.exports = async (ctx) => {
     const text = ctx.message.text;
     let user = getUser(userId);
     user.username = ctx.from.username || ctx.from.first_name || 'unknown';
+    user.first_name = ctx.from.first_name || 'Игрок';
+    if (!user.nickname) {
+        user.nickname = 'Игрок';
+    }
     saveUser(userId, user);
 
     // ===== ОБРАБОТКА РЕФЕРАЛЬНОЙ ССЫЛКИ =====

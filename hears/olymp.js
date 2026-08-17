@@ -14,7 +14,18 @@ module.exports = {
         let text = '🏆 ТОП-10 ГРАДОНАЧАЛЬНИКОВ:\n\n';
         sorted.forEach((user, i) => {
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-            text += `${medal} ${'@' + user.username || ctx.from.first_name} — 💰${user.gold}\n`;
+
+            // Приоритет: nickname → username → first_name
+            let name;
+            if (user.nickname && user.nickname !== 'Игрок') {
+                name = user.nickname;
+            } else if (user.username && user.username !== 'unknown') {
+                name = '@' + user.username;
+            } else {
+                name = user.first_name || 'Игрок';
+            }
+
+            text += `${medal} ${name} — 💰${user.gold}\n`;
         });
 
         await ctx.reply(text);
