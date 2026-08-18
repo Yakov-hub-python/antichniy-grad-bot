@@ -1,6 +1,6 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { getSoldiers, getPersonalBossHP, getBossReward } = require('../utils/helpers');
-const { updateQuestProgress } = require('../utils/quests');
+const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 
 module.exports = {
@@ -42,7 +42,8 @@ module.exports = {
             // Квест
             const questResult = updateQuestProgress(user, 'boss');
             if (questResult?.completed) {
-                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\nНаграда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+                claimQuestReward(user);
             }
 
             // Достижения
@@ -57,7 +58,7 @@ module.exports = {
                 `⚔️ ЛИЧНЫЙ БОСС ПОВЕРЖЕН!\n` +
                 `💰 +${reward} золота!\n` +
                 `🏆 Убийств: ${personal.kills}\n` +
-                `⏳ Следующий через 3 часов.`
+                `⏳ Следующий через 3 часа.`
             );
         } else {
             user.personalBoss = personal;
@@ -85,8 +86,7 @@ module.exports = {
         };
 
         if (!global.active) {
-            return ctx.reply('💤 Глобальный босс повержен. Следующий в 00:00,\
-                6:00, 12:00 или 18:00');
+            return ctx.reply('💤 Глобальный босс повержен. Следующий в 00:00, 06:00, 12:00 или 18:00.');
         }
 
         const soldiers = getSoldiers(user);
@@ -102,6 +102,7 @@ module.exports = {
         }
 
         if (global.hp <= 0) {
+            // ===== БОСС УБИТ =====
             global.active = false;
             const sorted = global.participants.sort((a, b) => b.damage - a.damage);
             const top = sorted.slice(0, 3);
@@ -124,7 +125,6 @@ module.exports = {
                         `🥈 ${i+1} место! +2000 золота!`
                     );
                 }
-                // ✅ СОХРАНЯЕМ КАЖДОГО ИЗ ТОП-3
                 saveUser(top[i].id, player);
             }
 
@@ -133,31 +133,40 @@ module.exports = {
             for (const p of global.participants) {
                 const player = getUser(p.id);
                 player.coins += share;
-                // ✅ СОХРАНЯЕМ КАЖДОГО УЧАСТНИКА
                 saveUser(p.id, player);
             }
 
-            // ===== СОЗДАЁМ НОВОГО БОССА =====
-            const userCount = Object.keys(db.users || {}).length;
-            global.hp = 5000 + 1000 * Math.floor(userCount / 2) || 5000;
-            global.maxHp = global.hp;
-            global.active = true;
-            global.participants = [];
+            // ✅ СОХРАНЯЕМ АТАКУЮЩЕГО (он уже мог быть сохранён как участник/топ, но страховка)
+            saveUser(userId, user);
+
+            // ===== ОБНОВЛЯЕМ БАЗУ ДАННЫХ: БОСС МЁРТВ, НЕ ПЕРЕСОЗДАЁМ =====
             db.globalBoss = global;
             writeDB(db);
+
+            // ===== КВЕСТ ДЛЯ АТАКУЮЩЕГО =====
+            // Перезапрашиваем пользователя, чтобы получить свежие данные (награды уже сохранены)
+            const freshUser = getUser(userId);
+            const questResult = updateQuestProgress(freshUser, 'boss');
+            if (questResult?.completed) {
+                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+                claimQuestReward(freshUser);
+            }
+
+            // ===== ДОСТИЖЕНИЯ ДЛЯ АТАКУЮЩЕГО =====
+            const newAchievements = checkAchievements(freshUser);
+            for (const ach of newAchievements) {
+                await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
+                claimAchievementReward(freshUser, ach);
+                await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
+            }
 
             await ctx.reply(
                 `🌍 ГЛОБАЛЬНЫЙ БОСС ПОВЕРЖЕН!\n` +
                 `🪙 Все участники получили +${share} монет!\n` +
-                `⏳ Новый босс уже появился!`
+                `⏳ Следующий появится в 00:00, 06:00, 12:00 или 18:00.`
             );
-            const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
-            const questResult = updateQuestProgress(user, 'boss');
-            if (questResult?.completed) {
-                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
-                claimQuestReward(user);
-            }
         } else {
+            // ===== БОСС ЕЩЁ ЖИВ =====
             db.globalBoss = global;
             writeDB(db);
             await ctx.reply(`⚔️ Урон: ${damage}. Осталось HP: ${global.hp}/${global.maxHp}`);
