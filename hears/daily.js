@@ -1,6 +1,6 @@
 const { getUser, saveUser } = require('../utils/storage');
 const { isVIP } = require('../utils/helpers');
-const { getTodayBonus } = require('../utils/dailyBonus');
+const { getWeeklyBonus } = require('../utils/events');
 
 module.exports = {
     get: async (ctx) => {
@@ -20,46 +20,39 @@ module.exports = {
         }
 
         // Получаем бонус дня
-        const bonus = getTodayBonus();
-        const vipBonus = isVIP(user) ? 400 : 250;
-        
-        // Базовый бонус
+        const weeklyBonus = getWeeklyBonus();
+        let weeklyText = '';
+        if (weeklyBonus) {
+            let description = '';
+            if (weeklyBonus.type === 'mine') description = 'x2 доход с шахт и карьеров сегодня';
+            else if (weeklyBonus.type === 'farm') description = 'x2 доход с ферм и полей сегодня';
+            else if (weeklyBonus.type === 'mint') description = 'x2 доход с монетных дворов и фабрик сегодня';
+            else if (weeklyBonus.type === 'hire') description = 'x2 солдаты при найме сегодня';
+            else if (weeklyBonus.type === 'build') description = 'Скидка 30% на постройки сегодня';
+            else if (weeklyBonus.type === 'boss') description = 'x2 урон по боссам сегодня';
+            else if (weeklyBonus.type === 'daily') description = 'x2 ежедневный бонус сегодня';
+            weeklyText = `\n📅 Сегодня: ${weeklyBonus.icon} ${weeklyBonus.name}\n📖 ${description}\n`;
+        }
+
+        const vipBonus = isVIP(user) ? 50 : 25;
         user.gold += vipBonus;
         
-        // Дополнительный бонус за сегодня
+        // Дополнительный бонус
         let extraBonus = '';
-        if (bonus.type === 'gold') {
-            user.gold += 20;
-            extraBonus = '💰 +20 золота (Золотая лихорадка)';
-        } else if (bonus.type === 'coins') {
-            user.coins = (user.coins || 0) + 15;
-            extraBonus = '🪙 +15 монет (Монетный дождь)';
-        } else if (bonus.type === 'soldiers') {
-            user.soldiers = (user.soldiers || 0) + 3;
-            extraBonus = '⚔️ +3 солдата (Воинский призыв)';
-        } else if (bonus.type === 'build') {
-            user.gold += 30;
-            extraBonus = '💰 +30 золота (Строительный бум)';
+        if (weeklyBonus?.type === 'daily') {
+            user.gold += 10;
+            extraBonus = '💰 +10 золота (День отдыха)';
         } else {
             user.gold += 10;
             extraBonus = '💰 +10 золота (Бонус дня)';
         }
 
         user.lastDaily = now;
-        
-        // Сохраняем бонус дня в профиль
-        if (!user.dailyBonus) {
-            user.dailyBonus = {};
-        }
-        user.dailyBonus.lastBonus = bonus.id;
-        user.dailyBonus.bonusDate = now;
-        
         saveUser(userId, user);
 
         await ctx.reply(
-            `🎁 ЕЖЕДНЕВНЫЙ БОНУС!\n\n` +
-            `📅 Сегодня: ${bonus.emoji} ${bonus.name}\n` +
-            `📖 ${bonus.description}\n\n` +
+            `🎁 ЕЖЕДНЕВНЫЙ БОНУС!\n` +
+            `${weeklyText}\n` +
             `💰 +${vipBonus} золота (ежедневный)\n` +
             `${extraBonus}\n\n` +
             `💰 Баланс: ${user.gold} золота\n` +

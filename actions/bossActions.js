@@ -2,6 +2,7 @@ const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { getSoldiers, getPersonalBossHP, getBossReward } = require('../utils/helpers');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
+const { getBossDamageMultiplier } = require('../utils/events'); // ← ДОБАВЛЕНО
 
 module.exports = {
     // ============================================================
@@ -19,7 +20,8 @@ module.exports = {
         }
 
         const soldiers = getSoldiers(user);
-        const damage = soldiers * 3;
+        const multiplier = getBossDamageMultiplier(); // ← ДОБАВЛЕНО
+        const damage = soldiers * 3 * multiplier;    // ← ИЗМЕНЕНО
         personal.hp -= damage;
 
         if (personal.hp <= 0) {
@@ -90,7 +92,8 @@ module.exports = {
         }
 
         const soldiers = getSoldiers(user);
-        const damage = soldiers * 2;
+        const multiplier = getBossDamageMultiplier(); // ← ДОБАВЛЕНО
+        const damage = soldiers * 2 * multiplier;    // ← ИЗМЕНЕНО
         global.hp -= damage;
 
         if (!global.participants) global.participants = [];
@@ -136,10 +139,9 @@ module.exports = {
                 saveUser(p.id, player);
             }
 
-            // ✅ СОХРАНЯЕМ АТАКУЮЩЕГО (он уже мог быть сохранён как участник/топ, но страховка)
-            saveUser(userId, user);
+            // ❌ УБРАЛИ ПРОБЛЕМНУЮ СТРОКУ: saveUser(userId, user);
 
-            // ===== ОБНОВЛЯЕМ БАЗУ ДАННЫХ: БОСС МЁРТВ, НЕ ПЕРЕСОЗДАЁМ =====
+            // ===== ОБНОВЛЯЕМ БАЗУ ДАННЫХ =====
             db.globalBoss = global;
             writeDB(db);
 

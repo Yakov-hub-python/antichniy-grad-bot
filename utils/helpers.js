@@ -1,4 +1,6 @@
 const { getUser } = require('./storage');
+const { applyWeeklyBonus } = require('./events');
+
 
 function isVIP(user) {
     return user.vip && user.vip.active && user.vip.expiresAt > Date.now();
@@ -74,7 +76,12 @@ function calculateIncome(user) {
     gold = Math.floor(gold * efficiency);
     food = Math.floor(food * efficiency);
     coins = Math.floor(coins * efficiency);
-    
+    // ===== ПРИМЕНЯЕМ ЕЖЕНЕВНЫЙ БОНУС =====
+    const incomeBeforeBonus = { gold, food, coins };
+    const bonusApplied = applyWeeklyBonus(incomeBeforeBonus, user);
+    gold = bonusApplied.gold;
+    food = bonusApplied.food;
+    coins = bonusApplied.coins;
     // ============================================================
     // 5️⃣ VIP БОНУС (+20%)
     // ============================================================

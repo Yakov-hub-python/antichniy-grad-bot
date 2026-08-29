@@ -1,8 +1,9 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { BUILDING_COSTS, BUILDING_NAMES } = require('../config/constants');
-const { updateQuestProgress } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 const city = require('../hears/city');
+const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
+
 
 module.exports = {
     build: async (ctx) => {
@@ -55,7 +56,6 @@ module.exports = {
                     `🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`
                 );
                 // Автоматически выдаём награду
-                const { claimQuestReward } = require('../utils/quests');
                 claimQuestReward(user);
             }
         }
@@ -84,7 +84,7 @@ module.exports = {
                 await ctx.telegram.sendMessage(user.referredBy, `🎉 Твой друг @${user.username} достиг 5 уровня! Вы получили VIP на ${vipDays} дней!`);
             } catch (err) {}
         }
-        const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
+        
         const questResult = updateQuestProgress(user, 'build', 1);
         if (questResult?.completed) {
             await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
