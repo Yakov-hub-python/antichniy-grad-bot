@@ -2,6 +2,7 @@ const { getUser, saveUser } = require('../utils/storage');
 const { calculateIncome, getIncomeInterval, isVIP } = require('../utils/helpers');
 const { updateQuestProgress } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
+const { advanceTraining } = require('../utils/training');
 
 module.exports = {
     collect: async (ctx) => {
@@ -31,6 +32,21 @@ module.exports = {
         user.coins = (user.coins || 0) + income.coins;
         user.lastIncome = now;
         
+
+        const trainingResult = advanceTraining(user, 'collect_income');
+        if (trainingResult) {
+            if (trainingResult.completed) {
+                await ctx.reply(`🎉 ОБУЧЕНИЕ ЗАВЕРШЕНО!\nНаграда: ${trainingResult.step.reward}💰\n\nТы готов к игре! 🏛️`);
+            } else {
+                const nextStep = trainingResult.nextStep;
+                await ctx.reply(
+                    `✅ Шаг ${trainingResult.step.id} выполнен!\n💰 +${trainingResult.step.reward} золота\n\n` +
+                    `📚 СЛЕДУЮЩИЙ ШАГ:\n${nextStep.title}\n${nextStep.description}\n\n` +
+                    `🏆 Награда: ${nextStep.reward}💰`
+                );
+            }
+            saveUser(userId, user);
+        }
         saveUser(userId, user);
         
         let message = `💰 СОБРАН ДОХОД!\n\n`;
@@ -48,10 +64,6 @@ module.exports = {
         }
         
         await ctx.reply(message);
-
-        // ============================================================
-        // ⬇️ СЮДА ВСТАВЛЯЕМ ⬇️
-        // ============================================================
 
         // ===== ОБНОВЛЯЕМ КВЕСТ (income) =====
         const questResult = updateQuestProgress(user, 'income');

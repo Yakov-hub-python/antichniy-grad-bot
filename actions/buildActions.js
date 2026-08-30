@@ -3,7 +3,7 @@ const { BUILDING_COSTS, BUILDING_NAMES } = require('../config/constants');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 const city = require('../hears/city');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
-
+const { advanceTraining } = require('../utils/training');
 
 module.exports = {
     build: async (ctx) => {
@@ -89,6 +89,25 @@ module.exports = {
         if (questResult?.completed) {
             await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
             claimQuestReward(user);
+        }
+        
+
+        // Для хижины, фермы, шахты
+        if (type === 'hut' || type === 'farm' || type === 'mine') {
+            const trainingResult = advanceTraining(user, 'build_' + type);
+            if (trainingResult) {
+                if (trainingResult.completed) {
+                    await ctx.reply(`🎉 ОБУЧЕНИЕ ЗАВЕРШЕНО!\nНаграда: ${trainingResult.step.reward}💰\n\nТы готов к игре! 🏛️`);
+                } else {
+                    const nextStep = trainingResult.nextStep;
+                    await ctx.reply(
+                        `✅ Шаг ${trainingResult.step.id} выполнен!\n💰 +${trainingResult.step.reward} золота\n\n` +
+                        `📚 СЛЕДУЮЩИЙ ШАГ:\n${nextStep.title}\n${nextStep.description}\n\n` +
+                        `🏆 Награда: ${nextStep.reward}💰`
+                    );
+                }
+                saveUser(userId, user);
+            }
         }
         saveUser(userId, user);
         await ctx.reply(`✅ ${BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`);

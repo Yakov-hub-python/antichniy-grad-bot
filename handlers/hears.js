@@ -563,4 +563,53 @@ module.exports = (bot) => {
             'Чат: @antichniy_grad_chat'
         );
     });
+    bot.hears(['топ стрик', 'topstreak', 'стрик топ'], async (ctx) => {
+        // копируем логику из команды /topstreak
+        const db = readDB();
+        const sorted = Object.values(db.users)
+            .filter(u => u.dailyStreak && u.dailyStreak > 0)
+            .sort((a, b) => (b.dailyStreak || 0) - (a.dailyStreak || 0))
+            .slice(0, 10);
+
+        if (sorted.length === 0) {
+            return ctx.reply('📭 Пока никто не начал стрик.');
+        }
+
+        let text = '📆 ТОП-10 ПО СТРИКУ:\n\n';
+        sorted.forEach((user, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+            const name = user.nickname && user.nickname !== 'Игрок' 
+                ? user.nickname 
+                : user.username && user.username !== 'unknown' 
+                    ? '@' + user.username 
+                    : user.first_name || 'Игрок';
+            const streak = user.dailyStreak || 0;
+            text += `${medal} ${name} — ${streak} дней\n`;
+        });
+
+        await ctx.reply(text);
+    });
+    bot.hears(['обучение', 'training', 'туториал', 'тренировка'], async (ctx) => {
+        const userId = ctx.from.id;
+        const user = getUser(userId);
+
+        const { getFirstStep, startTraining, isTrainingComplete } = require('../utils/training');
+
+        if (isTrainingComplete(user)) {
+            return ctx.reply('✅ Ты уже прошёл обучение! Начинай строить свой город.');
+        }
+
+        startTraining(user);
+        const step = getFirstStep();
+
+        const text = 
+            `📚 ОБУЧЕНИЕ: ШАГ 1 / 4\n\n` +
+            `${step.title}\n${step.description}\n\n` +
+            `💡 ${step.hint}\n\n` +
+            `🏆 Награда за выполнение: ${step.reward}💰\n\n` +
+            `👉 Выполни действие и получи награду!`;
+
+        saveUser(userId, user);
+        await ctx.reply(text);
+    });
 };

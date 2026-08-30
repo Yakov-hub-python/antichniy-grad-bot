@@ -3,7 +3,7 @@ const { MAIN_MENU } = require('../config/constants');
 const { showMainMenu } = require('../handlers/menu');
 const { updateQuestProgress } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
-
+const { startTraining, getFirstStep } = require('../utils/training');
 module.exports = async (ctx) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
@@ -79,6 +79,24 @@ module.exports = async (ctx) => {
         await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
     }
 
+
+    if (!user.training) {
+        startTraining(user);
+        const step = getFirstStep();
+        
+        await ctx.reply(
+            `🏛️ ДОБРО ПОЖАЛОВАТЬ, ${ctx.from.first_name.toUpperCase()}!\n\n` +
+            `📚 ОБУЧЕНИЕ: ШАГ 1 / 4\n\n` +
+            `${step.title}\n${step.description}\n\n` +
+            `💡 ${step.hint}\n\n` +
+            `🏆 Награда: ${step.reward}💰\n\n` +
+            `💰 Золото: ${user.gold}\n` +
+            `🏗️ Уровень: ${user.level}\n` +
+            `👥 Друзей: ${user.referrals?.length || 0}`
+        );
+        saveUser(userId, user);
+        return;
+    }
     // ===== ПРИВЕТСТВИЕ =====
     await ctx.reply(
         `🏛️ ДОБРО ПОЖАЛОВАТЬ, ${ctx.from.first_name.toUpperCase()}!\n\n` +

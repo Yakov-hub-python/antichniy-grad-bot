@@ -38,7 +38,6 @@ function getUser(id) {
     let needSave = false;
     
     if (!db.users[id]) {
-        // Новый пользователь
         db.users[id] = {
             id: id,
             gold: 200,
@@ -47,6 +46,7 @@ function getUser(id) {
             citizens: 5,
             soldiers: 0,
             level: 1,
+            dailyStreak: 0,
             buildings: {
                 hut: 0,
                 farm: 0,
@@ -122,7 +122,10 @@ function getUser(id) {
             };
             needSave = true;
         }
-        
+        if (user.dailyStreak === undefined) {
+            user.dailyStreak = 0;
+            needSave = true;
+        }
         // ===== МИГРАЦИЯ ЗДАНИЙ =====
         if (!user.buildings) {
             // Если buildings вообще нет - создаем с нуля

@@ -19,7 +19,7 @@ const callbacks = require('./handlers/callback');
 const { readDB, writeDB } = require('./utils/storage');
 const promoHandler = require('./handlers/promo');
 const { handleAdvancedCommand } = require('./hears/advanced');
-const { startCron } = require('./handlers/cron'); // ← ПОДКЛЮЧАЕМ КРОНЫ
+const { startCron } = require('./handlers/cron');
 
 promoHandler(bot);
 commands(bot);
@@ -62,14 +62,12 @@ server.listen(PORT, () => {
     log('HTTP', `✅ Сервер на порту ${PORT}`);
 });
 
-// ===== ЗАПУСК БОТА =====
+
 bot.launch()
     .then(() => {
         log('START', '✅ Бот готов!');
         console.log('='.repeat(40));
-        // ЗАПУСКАЕМ КРОНЫ
-        startCron(bot);
-        console.log('⏰ Крон-задачи запущены');
+        startCron(bot); 
     })
     .catch(err => {
         console.error('❌ Ошибка:', err.message);
