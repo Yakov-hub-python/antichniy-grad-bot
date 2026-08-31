@@ -6,7 +6,8 @@ module.exports = {
         mint: { gold: 120, coins: 0, level: 1 },
         field: { gold: 0, coins: 1000, level: 5 },
         quarry: { gold: 0, coins: 750, level: 3 },
-        mint_factory: { gold: 0, coins: 5000, level: 10 }
+        mint_factory: { gold: 0, coins: 5000, level: 10 },
+        acropolis: { gold: 0, coins: 500, level: 5, temporary: false }
     },
     BUILDING_NAMES: {
         hut: '🏠 Хижина',
@@ -15,7 +16,8 @@ module.exports = {
         mint: '🪙 Монетный двор',
         field: '🌾 Поле',
         quarry: '⛰️ Карьер',
-        mint_factory: '🏭 Фабрика монет'
+        mint_factory: '🏭 Фабрика монет',
+        acropolis: '🏛️ Акрополь (эксклюзив)'
     },
     INCOME_INTERVALS: {
         regular: 90 * 1000,  // 1.5 минуты (ИСПРАВЛЕНО)

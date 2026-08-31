@@ -76,6 +76,19 @@ function calculateIncome(user) {
     gold = Math.floor(gold * efficiency);
     food = Math.floor(food * efficiency);
     coins = Math.floor(coins * efficiency);
+
+    
+    const { getEventMultiplier, isAcropolisActive } = require('./event_handlers');
+    const eventMultiplier = getEventMultiplier();
+    gold = Math.floor(gold * eventMultiplier);
+    food = Math.floor(food * eventMultiplier);
+    coins = Math.floor(coins * eventMultiplier);
+
+    if (isAcropolisActive(user)) {
+        gold = Math.floor(gold * 1.1);
+        food = Math.floor(food * 1.1);
+        coins = Math.floor(coins * 1.1);
+    }
     // ===== ПРИМЕНЯЕМ ЕЖЕНЕВНЫЙ БОНУС =====
     const incomeBeforeBonus = { gold, food, coins };
     const bonusApplied = applyWeeklyBonus(incomeBeforeBonus, user);

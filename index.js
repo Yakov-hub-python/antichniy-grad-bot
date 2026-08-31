@@ -16,13 +16,14 @@ const bot = new Telegraf(BOT_TOKEN);
 const commands = require('./handlers/commands');
 const hears = require('./handlers/hears');
 const callbacks = require('./handlers/callback');
-const { readDB, writeDB } = require('./utils/storage');
 const promoHandler = require('./handlers/promo');
 const { handleAdvancedCommand } = require('./hears/advanced');
 const { startCron } = require('./handlers/cron');
+const { startQuiz, handleQuizAnswer } = require('./handlers/quiz');
 
 promoHandler(bot);
 commands(bot);
+bot.command('question', startQuiz);
 hears(bot);
 callbacks(bot);
 
@@ -36,6 +37,10 @@ log('START', '🚀 Бот запущен');
 
 // ===== ОБРАБОТЧИК ТЕКСТА =====
 bot.on('text', async (ctx) => {
+    const answer = ctx.message.text.trim();
+    if (/^[123]$/.test(answer)) {
+        await handleQuizAnswer(ctx);
+    }
     const text = ctx.message.text;
     if (text.startsWith('/')) return;
     await handleAdvancedCommand(ctx);

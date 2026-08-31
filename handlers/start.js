@@ -14,7 +14,14 @@ module.exports = async (ctx) => {
         user.nickname = 'Игрок';
     }
     saveUser(userId, user);
-
+    const { isEventDay, applyEventBonus } = require('../utils/event_handlers');
+    if (isEventDay()) {
+        const bonusApplied = applyEventBonus(user);
+        if (bonusApplied) {
+            saveUser(userId, user);
+            await ctx.reply('🎁 С ДНЁМ ЗНАНИЙ! Ты получил +100💰 и VIP на 1 день!');
+        }
+    }
     // ===== ОБРАБОТКА РЕФЕРАЛЬНОЙ ССЫЛКИ =====
     if (text.includes('ref_')) {
         const refId = text.split('_')[1];

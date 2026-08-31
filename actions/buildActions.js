@@ -26,7 +26,20 @@ module.exports = {
         if (user.coins < cost.coins) {
             return ctx.reply(`❌ Не хватает монет! Нужно ${cost.coins}, у тебя ${user.coins}`);
         }
-
+        if (type === 'acropolis') {
+            const { isAcropolisAvailableForUser, buildAcropolis } = require('../utils/event_handlers');
+            if (!isAcropolisAvailableForUser(user)) {
+                return ctx.reply('❌ Акрополь можно построить только с 1 по 3 сентября, начиная с 5 уровня.');
+            }
+            if (user.acropolisBuilt) {
+                return ctx.reply('✅ Ты уже построил Акрополь!');
+            }
+            const result = buildAcropolis(user);
+            if (result?.error) return ctx.reply(result.error);
+            saveUser(userId, user);
+            await ctx.reply('🏛️ Акрополь построен! Теперь он навсегда с тобой.\n📈 +10% ко всем доходам навсегда!');
+            return;
+        }
         // Списываем ресурсы
         const spentGold = cost.gold || 0;
         const spentCoins = cost.coins || 0;
