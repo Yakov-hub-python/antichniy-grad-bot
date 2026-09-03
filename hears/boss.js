@@ -27,7 +27,7 @@ module.exports = {
         await ctx.reply(
             `⚔️ БОССЫ\n\n` +
             `👤 ЛИЧНЫЙ БОСС:\nHP: ${personal.hp}/${personal.maxHp}\n${personalStatus}\n🏆 Убийств: ${personal.kills || 0}\n\n` +
-            `🌍 ГЛОБАЛЬНЫЙ БОСС:\n${globalStatus}`,
+            `🌍 ГЛОБАЛЬНЫЙ БОСС:ОТМЕНЕН\n`, //${globalStatus}
             {
                 reply_markup: {
                     inline_keyboard: [

@@ -1,8 +1,6 @@
 const { getUser, saveUser } = require('../utils/storage');
-const { BUILDING_COSTS, BUILDING_NAMES } = require('../config/constants');
 const { showMainMenu } = require('../handlers/menu');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
-const {getSoldiers} = require('../utils/helpers')
 
 module.exports = (bot) => {
 
@@ -22,11 +20,11 @@ module.exports = (bot) => {
         const match = ctx.message.text.match(/продать еда (\d+)/);
         const amount = parseInt(match[1]);
         const user = await getUser(ctx.from.id);
-        
+
         if (user.food < amount) {
             return ctx.reply(`❌ У тебя только ${user.food} еды`);
         }
-        
+
         user.food -= amount;
         user.gold += amount;
         await saveUser(ctx.from.id, user);
@@ -37,11 +35,11 @@ module.exports = (bot) => {
         const match = ctx.message.text.match(/продать монеты (\d+)/);
         const amount = parseInt(match[1]);
         const user = await getUser(ctx.from.id);
-        
+
         if (user.coins < amount) {
             return ctx.reply(`❌ У тебя только ${user.coins} монет`);
         }
-        
+
         user.coins -= amount;
         user.gold += amount * 3;
         await saveUser(ctx.from.id, user);
@@ -51,11 +49,11 @@ module.exports = (bot) => {
     bot.hears(/продать еда все/, async (ctx) => {
         const user = await getUser(ctx.from.id);
         const amount = user.food;
-        
+
         if (amount === 0) {
             return ctx.reply('❌ У тебя нет еды');
         }
-        
+
         user.food = 0;
         user.gold += amount;
         await saveUser(ctx.from.id, user);
@@ -65,11 +63,11 @@ module.exports = (bot) => {
     bot.hears(/продать монеты все/, async (ctx) => {
         const user = await getUser(ctx.from.id);
         const amount = user.coins;
-        
+
         if (amount === 0) {
             return ctx.reply('❌ У тебя нет монет');
         }
-        
+
         user.coins = 0;
         user.gold += amount * 3;
         await saveUser(ctx.from.id, user);
@@ -85,11 +83,11 @@ module.exports = (bot) => {
         const amount = parseInt(match[1]);
         const user = await getUser(ctx.from.id);
         const cost = amount * 2;
-        
+
         if (user.gold < cost) {
             return ctx.reply(`❌ Нужно ${cost}💰, у тебя ${user.gold}💰`);
         }
-        
+
         user.gold -= cost;
         user.food += amount;
         await saveUser(ctx.from.id, user);
@@ -101,11 +99,11 @@ module.exports = (bot) => {
         const amount = parseInt(match[1]);
         const user = await getUser(ctx.from.id);
         const cost = amount * 6;
-        
+
         if (user.gold < cost) {
             return ctx.reply(`❌ Нужно ${cost}💰, у тебя ${user.gold}💰`);
         }
-        
+
         user.gold -= cost;
         user.coins += amount;
         await saveUser(ctx.from.id, user);
@@ -116,20 +114,21 @@ module.exports = (bot) => {
     // 4️⃣ СТРОИТЕЛЬСТВО
     // ============================================================
 
+    // построить с числом
     bot.hears(/построить (.+?) (\d+)/, async (ctx) => {
         const match = ctx.message.text.match(/построить (.+?) (\d+)/);
         const buildingName = match[1].trim();
         let count = parseInt(match[2]);
-        
+
         if (count <= 0) {
             return ctx.reply('❌ Количество должно быть больше 0');
         }
-        
+
         if (count > 10) {
             count = 10;
             await ctx.reply(`ℹ️ Можно построить не больше 10 зданий за раз. Строю 10.`);
         }
-        
+
         const buildingMap = {
             'хижину': 'hut', 'хижина': 'hut', 'hut': 'hut',
             'ферму': 'farm', 'ферма': 'farm', 'farm': 'farm',
@@ -139,71 +138,100 @@ module.exports = (bot) => {
             'казарму': 'barracks', 'казарма': 'barracks', 'barracks': 'barracks',
             'поле': 'field', 'field': 'field',
             'карьер': 'quarry', 'quarry': 'quarry',
-            'фабрику': 'mint_factory', 'фабрика': 'mint_factory', 'mint_factory': 'mint_factory'
+            'фабрику': 'mint_factory', 'фабрика': 'mint_factory', 'mint_factory': 'mint_factory',
+            'дом': 'house', 'house': 'house',
+            'таверну': 'tavern', 'таверна': 'tavern', 'tavern': 'tavern',
+            'железный рудник': 'iron_mine', 'рудник': 'iron_mine', 'iron_mine': 'iron_mine',
+            'сталелитейный завод': 'smelter', 'завод': 'smelter', 'smelter': 'smelter',
+            'банк': 'bank', 'bank': 'bank',
+            'кузницу': 'forge', 'кузница': 'forge', 'forge': 'forge',
+            'стены': 'walls', 'стену': 'walls', 'walls': 'walls',
+            'сад': 'garden', 'garden': 'garden',
+            'акрополь': 'acropolis', 'acropolis': 'acropolis'
         };
-        
+
         const buildingKey = buildingMap[buildingName];
         if (!buildingKey) {
-            return ctx.reply('❌ Неизвестное здание. Список: хижина, ферма, шахта, монетный двор, рынок, казарма, поле, карьер, фабрика');
+            return ctx.reply('❌ Неизвестное здание. Список: хижина, ферма, шахта, монетный двор, рынок, казарма, поле, карьер, фабрика, дом, таверна, железный рудник, сталелитейный завод, банк, кузница, стены, сад, акрополь');
         }
-        
-        const user = await getUser(ctx.from.id);
-        const cost = BUILDING_COSTS[buildingKey];
-        
-        const totalGoldNeeded = cost.gold * count;
-        const totalCoinsNeeded = cost.coins * count;
-        
-        if (cost.gold > 0 && user.gold < totalGoldNeeded) {
-            return ctx.reply(`❌ Нужно ${totalGoldNeeded}💰, у тебя ${user.gold}💰`);
-        }
-        
-        if (cost.coins > 0 && user.coins < totalCoinsNeeded) {
-            return ctx.reply(`❌ Нужно ${totalCoinsNeeded}🪙, у тебя ${user.coins}🪙`);
-        }
-        
-        if (cost.gold > 0) user.gold -= totalGoldNeeded;
-        if (cost.coins > 0) user.coins -= totalCoinsNeeded;
-        
-        const spentGold = cost.gold || 0;
-        const spentCoins = cost.coins || 0;
-        const totalSpent = spentGold + spentCoins;
 
-        if (totalSpent > 0) {
-            const questResult = updateQuestProgress(user, 'spend', totalSpent);
-            if (questResult?.completed) {
-                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
-                claimQuestReward(user);
-            }
+        const user = await getUser(ctx.from.id);
+        const { getProgressivePrice } = require('../utils/helpers');
+        const { BUILDING_COSTS, MAX_BUILDINGS, BUILDING_NAMES } = require('../config/constants');
+
+        const baseCost = BUILDING_COSTS[buildingKey];
+        const currentCount = user.buildings[buildingKey] || 0;
+
+        // Проверка лимита
+        if (MAX_BUILDINGS[buildingKey] !== undefined && currentCount + count > MAX_BUILDINGS[buildingKey]) {
+            const maxCanBuild = MAX_BUILDINGS[buildingKey] - currentCount;
+            return ctx.reply(`❌ Нельзя построить больше ${MAX_BUILDINGS[buildingKey]} зданий этого типа. Можно построить ещё ${maxCanBuild}.`);
         }
-        const questResult = updateQuestProgress(user, 'build', count || 1);
+
+        // Прогрессивная цена
+        let totalGold = 0;
+        let totalCoins = 0;
+        let totalIron = 0;
+        for (let i = 0; i < count; i++) {
+            const idx = currentCount + i;
+            totalGold += getProgressivePrice(baseCost.gold || 0, idx);
+            totalCoins += getProgressivePrice(baseCost.coins || 0, idx);
+            totalIron += getProgressivePrice(baseCost.iron || 0, idx);
+        }
+
+        if (user.gold < totalGold) {
+            return ctx.reply(`❌ Нужно ${totalGold}💰, у тебя ${user.gold}💰`);
+        }
+        if (user.coins < totalCoins) {
+            return ctx.reply(`❌ Нужно ${totalCoins}🪙, у тебя ${user.coins}🪙`);
+        }
+        if (user.iron < totalIron) {
+            return ctx.reply(`❌ Нужно ${totalIron}⛏️, у тебя ${user.iron || 0}⛏️`);
+        }
+
+        user.gold -= totalGold;
+        user.coins -= totalCoins;
+        user.iron -= totalIron;
+        user.buildings[buildingKey] += count;
+
+        // Эффекты
+        if (buildingKey === 'hut') user.citizens += count * 3;
+        if (buildingKey === 'house') user.citizens += count * 5;
+        if (buildingKey === 'tavern') user.citizens += count * 2;
+        if (buildingKey === 'barracks') user.soldiers += count * 2;
+        if (buildingKey === 'acropolis') {
+            user.acropolisBuilt = true;
+            user.acropolisBuiltDate = Date.now();
+        }
+
+        // Уровень
+        const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
+        user.level = totalBuildings + 1;
+
+        // Квесты
+        const questResult = updateQuestProgress(user, 'build', count);
         if (questResult?.completed) {
             await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
             claimQuestReward(user);
         }
-        
-        user.buildings[buildingKey] += count;
-        if (buildingKey === 'hut') user.citizens += count * 3;
-        
-        const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
-        user.level = totalBuildings + 1;
-        
+
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ ${count} ${BUILDING_NAMES[buildingKey]} построено!\
-            Уровень: ${user.level}`);
+        await ctx.reply(`✅ ${count} ${BUILDING_NAMES[buildingKey]} построено! Уровень: ${user.level}`);
     });
 
+    // построить без числа (1 здание)
     bot.hears(/построить/, async (ctx) => {
         const text = ctx.message.text;
         const words = text.split(/\s+/);
-        
+
         if (words.length === 1) {
             return require('../hears/build').showMenu(ctx);
         }
-        
+
         if (/\d/.test(text)) {
             return;
         }
-        
+
         const target = words.slice(1).join(' ');
         const buildingMap = {
             'хижину': 'hut', 'хижина': 'hut', 'hut': 'hut',
@@ -214,50 +242,71 @@ module.exports = (bot) => {
             'казарму': 'barracks', 'казарма': 'barracks', 'barracks': 'barracks',
             'поле': 'field', 'field': 'field',
             'карьер': 'quarry', 'quarry': 'quarry',
-            'фабрику': 'mint_factory', 'фабрика': 'mint_factory', 'mint_factory': 'mint_factory'
+            'фабрику': 'mint_factory', 'фабрика': 'mint_factory', 'mint_factory': 'mint_factory',
+            'дом': 'house', 'house': 'house',
+            'таверну': 'tavern', 'таверна': 'tavern', 'tavern': 'tavern',
+            'железный рудник': 'iron_mine', 'рудник': 'iron_mine', 'iron_mine': 'iron_mine',
+            'сталелитейный завод': 'smelter', 'завод': 'smelter', 'smelter': 'smelter',
+            'банк': 'bank', 'bank': 'bank',
+            'кузницу': 'forge', 'кузница': 'forge', 'forge': 'forge',
+            'стены': 'walls', 'стену': 'walls', 'walls': 'walls',
+            'сад': 'garden', 'garden': 'garden',
+            'акрополь': 'acropolis', 'acropolis': 'acropolis'
         };
-        
+
         const buildingKey = buildingMap[target];
         if (!buildingKey) {
-            return ctx.reply('❌ Неизвестное здание. Список: хижина, ферма, шахта, монетный двор, рынок, казарма, поле, карьер, фабрика');
+            return ctx.reply('❌ Неизвестное здание. Список: хижина, ферма, шахта, монетный двор, рынок, казарма, поле, карьер, фабрика, дом, таверна, железный рудник, сталелитейный завод, банк, кузница, стены, сад, акрополь');
         }
-        
-        const user = await getUser(ctx.from.id);
-        const cost = BUILDING_COSTS[buildingKey];
-        
-        if (cost.gold > 0 && user.gold < cost.gold) {
-            return ctx.reply(`❌ Нужно ${cost.gold}💰, у тебя ${user.gold}💰`);
-        }
-        
-        if (cost.coins > 0 && user.coins < cost.coins) {
-            return ctx.reply(`❌ Нужно ${cost.coins}🪙, у тебя ${user.coins}🪙`);
-        }
-        
-        if (cost.gold > 0) user.gold -= cost.gold;
-        if (cost.coins > 0) user.coins -= cost.coins;
-        
-        const spentGold = cost.gold || 0;
-        const spentCoins = cost.coins || 0;
-        const totalSpent = spentGold + spentCoins;
 
-        if (totalSpent > 0) {
-            const questResult = updateQuestProgress(user, 'spend', totalSpent);
-            if (questResult?.completed) {
-                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
-                claimQuestReward(user);
-            }
+        const user = await getUser(ctx.from.id);
+        const { getProgressivePrice } = require('../utils/helpers');
+        const { BUILDING_COSTS, MAX_BUILDINGS, BUILDING_NAMES } = require('../config/constants');
+
+        const baseCost = BUILDING_COSTS[buildingKey];
+        const currentCount = user.buildings[buildingKey] || 0;
+
+        if (MAX_BUILDINGS[buildingKey] !== undefined && currentCount >= MAX_BUILDINGS[buildingKey]) {
+            return ctx.reply(`❌ Нельзя построить больше ${MAX_BUILDINGS[buildingKey]} зданий этого типа.`);
         }
-        const questResult = updateQuestProgress(user, 'build', count || 1);
+
+        const price = getProgressivePrice(baseCost.gold || 0, currentCount);
+        const priceCoins = getProgressivePrice(baseCost.coins || 0, currentCount);
+        const priceIron = getProgressivePrice(baseCost.iron || 0, currentCount);
+
+        if (user.gold < price) {
+            return ctx.reply(`❌ Нужно ${price}💰, у тебя ${user.gold}💰`);
+        }
+        if (user.coins < priceCoins) {
+            return ctx.reply(`❌ Нужно ${priceCoins}🪙, у тебя ${user.coins}🪙`);
+        }
+        if (user.iron < priceIron) {
+            return ctx.reply(`❌ Нужно ${priceIron}⛏️, у тебя ${user.iron || 0}⛏️`);
+        }
+
+        user.gold -= price;
+        user.coins -= priceCoins;
+        user.iron -= priceIron;
+        user.buildings[buildingKey] += 1;
+
+        if (buildingKey === 'hut') user.citizens += 3;
+        if (buildingKey === 'house') user.citizens += 5;
+        if (buildingKey === 'tavern') user.citizens += 2;
+        if (buildingKey === 'barracks') user.soldiers += 2;
+        if (buildingKey === 'acropolis') {
+            user.acropolisBuilt = true;
+            user.acropolisBuiltDate = Date.now();
+        }
+
+        const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
+        user.level = totalBuildings + 1;
+
+        const questResult = updateQuestProgress(user, 'build', 1);
         if (questResult?.completed) {
             await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
             claimQuestReward(user);
         }
-        user.buildings[buildingKey] += 1;
-        if (buildingKey === 'hut') user.citizens += 3;
-        
-        const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
-        user.level = totalBuildings + 1;
-        
+
         await saveUser(ctx.from.id, user);
         await ctx.reply(`✅ ${BUILDING_NAMES[buildingKey]} построена! Уровень: ${user.level}`);
     });
@@ -270,17 +319,17 @@ module.exports = (bot) => {
         const userId = ctx.from.id;
         const user = getUser(userId);
         const { getDailyQuest } = require('../utils/quests');
-        
+
         const quest = getDailyQuest(user);
-        
+
         if (quest.completed) {
             return ctx.reply(`✅ КВЕСТ ВЫПОЛНЕН!\n\n${quest.name}\n🏆 Награда: ${quest.reward === 'vip_3' ? 'VIP 3 дня' : quest.reward + '💰'}`);
         }
-        
+
         const progress = Math.min(quest.progress, quest.target);
         const percent = Math.floor((progress / quest.target) * 10);
         const bar = '█'.repeat(percent) + '░'.repeat(10 - percent);
-        
+
         await ctx.reply(
             `🎯 ЕЖЕДНЕВНЫЙ КВЕСТ\n\n` +
             `${quest.name}\n` +
@@ -299,14 +348,14 @@ module.exports = (bot) => {
         const userId = ctx.from.id;
         const user = getUser(userId);
         const { getAchievements } = require('../utils/achievements');
-        
+
         const achievements = getAchievements(user);
         const unlocked = achievements.filter(a => a.unlocked);
         const locked = achievements.filter(a => !a.unlocked);
-        
+
         let text = '🏆 ДОСТИЖЕНИЯ\n\n';
         text += `✅ Получено: ${unlocked.length}/${achievements.length}\n\n`;
-        
+
         if (unlocked.length > 0) {
             text += '📌 ПОЛУЧЕНЫ:\n';
             for (const a of unlocked) {
@@ -314,7 +363,7 @@ module.exports = (bot) => {
             }
             text += '\n';
         }
-        
+
         if (locked.length > 0) {
             text += '📌 НЕ ПОЛУЧЕНЫ:\n';
             const next = locked.slice(0, 5);
@@ -325,7 +374,7 @@ module.exports = (bot) => {
                 text += `  ... и ещё ${locked.length - 5}\n`;
             }
         }
-        
+
         await ctx.reply(text);
     });
 
@@ -337,31 +386,53 @@ module.exports = (bot) => {
         const match = ctx.message.text.match(/нанять (\d+)/);
         const amount = parseInt(match[1]);
         const user = await getUser(ctx.from.id);
+
+        const MAX_SOLDIERS = 10000;
+        if (user.soldiers + amount > MAX_SOLDIERS) {
+            return ctx.reply(`❌ Нельзя нанять больше ${MAX_SOLDIERS} солдат. У тебя уже ${user.soldiers}.`);
+        }
+
         const cost = amount * 6;
-        
+        const ironCost = amount * 1;
+
         if (user.coins < cost) {
             return ctx.reply(`❌ Нужно ${cost} монет, у тебя ${user.coins}`);
         }
-        
+        if (user.iron < ironCost) {
+            return ctx.reply(`❌ Нужно ${ironCost} железа, у тебя ${user.iron || 0}`);
+        }
+
         user.coins -= cost;
+        user.iron -= ironCost;
         user.soldiers += amount;
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Нанято ${amount} солдат за ${cost} монет`);
+        await ctx.reply(`✅ Нанято ${amount} солдат за ${cost} монет и ${ironCost} железа`);
     });
 
     bot.hears(/нанять все/, async (ctx) => {
         const user = await getUser(ctx.from.id);
-        const amount = Math.floor(user.coins / 6);
-        
+        const amount = Math.floor(Math.min(user.coins / 6, user.iron));
+
         if (amount === 0) {
-            return ctx.reply('❌ Не хватает монет для найма хотя бы одного солдата');
+            return ctx.reply('❌ Не хватает монет или железа для найма хотя бы одного солдата');
         }
-        
-        const cost = amount * 6;
+
+        const MAX_SOLDIERS = 10000;
+        const maxCanHire = MAX_SOLDIERS - user.soldiers;
+        const finalAmount = Math.min(amount, maxCanHire);
+
+        if (finalAmount <= 0) {
+            return ctx.reply(`❌ У тебя уже ${user.soldiers} солдат. Максимум ${MAX_SOLDIERS}.`);
+        }
+
+        const cost = finalAmount * 6;
+        const ironCost = finalAmount * 1;
+
         user.coins -= cost;
-        user.soldiers += amount;
+        user.iron -= ironCost;
+        user.soldiers += finalAmount;
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Нанято ${amount} солдат за ${cost} монет`);
+        await ctx.reply(`✅ Нанято ${finalAmount} солдат за ${cost} монет и ${ironCost} железа`);
     });
 
     // ============================================================
@@ -379,7 +450,7 @@ module.exports = (bot) => {
     });
 
     // ============================================================
-    // 9️⃣ ПРОСТЫЕ КОМАНДЫ
+    // 9️⃣ ПРОСТЫЕ КОМАНДЫ (КНОПКИ + ТЕКСТ)
     // ============================================================
 
     bot.hears(['рынок', 'market'], async (ctx) => {
@@ -395,22 +466,7 @@ module.exports = (bot) => {
     });
 
     bot.hears(['казарма', 'barracks'], async (ctx) => {
-        const user = getUser(ctx.from.id);
-        const soldiers = getSoldiers(user);
-        await ctx.reply(
-            `🪖 КАЗАРМА\n\n` +
-            `🪖 Солдаты: ${soldiers}\n` + 
-            `💰 Цена: 1 воин = 6 монет\n\n` +
-            `⚔️ Каждый солдат даёт 5 урона боссам.`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'Нанять воинов', callback_data: 'hire_warriors_1' }],
-                        [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-                    ]
-                }
-            }
-        );
+        await require('../hears/barracks').show(ctx);
     });
 
     bot.hears(['бонус', 'daily', 'ежедневный'], async (ctx) => {
@@ -427,68 +483,27 @@ module.exports = (bot) => {
 
     bot.hears(['помощь', 'help', 'команды'], async (ctx) => {
         await ctx.reply(
-            `📖 СПИСОК КОМАНД\n\n` +
-
-            `🎮 ИГРОВЫЕ:\n` +
-            `/start — начать игру\n` +
-            `/menu — главное меню\n` +
-            `/city — город и статистика\n` +
-            `/build — строительство\n` +
-            `/income — собрать доход\n` +
-            `/daily — ежедневный бонус\n` +
-            `/boss — боссы\n` +
-            `/olymp — топ-10 игроков\n` +
-            `/profile — мой профиль\n\n` +
-
-            `🪖 АРМИЯ:\n` +
-            `/barracks — казарма\n` +
-            `/hire <количество> — нанять воинов\n\n` +
-
-            `👥 РЕФЕРАЛЫ:\n` +
-            `/referral — ссылка для друзей\n\n` +
-
-            `🏪 ТОРГОВЛЯ:\n` +
-            `/market — рынок\n` +
-            `/sell <ресурс> <кол-во> — продать\n` +
-            `/buy <ресурс> <кол-во> — купить\n\n` +
-
-            `🎁 ПРОМОКОДЫ:\n` +
-            `/promo <код> — активировать промокод\n\n` +
-
-            `🎯 КВЕСТЫ И ДОСТИЖЕНИЯ:\n` +
-            `/quests — текущий квест\n` +
-            `/achievements — все достижения\n\n` +
-
-            `👤 ПРОФИЛЬ:\n` +
-            `/setnickname <ник> — установить ник в игре\n\n` +
-
-            `🛠 ОСТАЛЬНОЕ:\n` +
-            `/help — помощь\n` +
-            `/menu — главное меню\n\n` +
-
-            `📢 Канал: @antichniy_grad\n` +
-            `💬 Чат: @antichniy_grad_chat`
+            '📖 СПИСОК КОМАНД\n\n' +
+            'Текстовые команды:\n' +
+            '• продать еда 10\n' +
+            '• продать монеты 5\n' +
+            '• купить еда 10\n' +
+            '• купить монеты 5\n' +
+            '• построить хижину\n' +
+            '• нанять 10\n' +
+            '• атаковать босса\n' +
+            '• рынок / город / босс / бонус / топ\n\n' +
+            'Кнопки в меню для быстрого доступа!'
         );
     });
 
     bot.hears(['о боте', 'инфо'], async (ctx) => {
         await ctx.reply(
             '🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n' +
-            'Версия: 1.5.1\n' +
-            'Разработчик: @DEDAYSON (https://t.me/DEDAYSON)\n\n' +
-            '📖 О ПРОЕКТЕ\n' +
+            'Версия: 1.5.2.1\n' +
+            'Разработчик: @DEDAYSON\n\n' +
             'Экономическая стратегия в Telegram.\n' +
-            'Строй свой город, добывай ресурсы,\n' +
-            'сражайся с боссами и приводи друзей!\n\n' +
-            '🔗 ИСХОДНЫЙ КОД\n' +
-            'https://github.com/Yakov-hub-python/antichniy-grad-bot\n\n' +
-            '🙏 БЛАГОДАРНОСТИ\n' +
-            '• @KimiAntonelliF1DriverOficcial — за тестирование и поддержку\n' +
-            '• @MAMA_I_SUAY — за первый фидбек\n' +
-            '• всем игрокам — за вашу активность!\n\n' +
-            '📢 КАНАЛ И ЧАТ\n' +
-            'Канал: @antichniy_grad\n' +
-            'Чат: @antichniy_grad_chat'
+            'Строй, воюй, приводи друзей!'
         );
     });
 
@@ -497,7 +512,7 @@ module.exports = (bot) => {
     });
 
     // ============================================================
-    // 🔟 КНОПКИ ИЗ МЕНЮ
+    // 🔟 КНОПКИ ИЗ МЕНЮ (ДУБЛЬ, ЧТОБЫ РАБОТАЛИ)
     // ============================================================
 
     bot.hears('🏙️ Город', async (ctx) => {
@@ -512,7 +527,7 @@ module.exports = (bot) => {
         await require('../hears/market').showMarketMenu(ctx);
     });
 
-    bot.hears('Казарма', async (ctx) => {
+    bot.hears('🪖 Казарма', async (ctx) => {
         const user = getUser(ctx.from.id);
         const soldiers = getSoldiers(user);
         await ctx.reply(
@@ -546,49 +561,17 @@ module.exports = (bot) => {
     bot.hears('ℹ️ О боте', async (ctx) => {
         await ctx.reply(
             '🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n' +
-            'Версия: 1.5.1\n' +
-            'Разработчик: @DEDAYSON (https://t.me/DEDAYSON)\n\n' +
-            '📖 О ПРОЕКТЕ\n' +
+            'Версия: 1.5.2.1\n' +
+            'Разработчик: @DEDAYSON\n\n' +
             'Экономическая стратегия в Telegram.\n' +
-            'Строй свой город, добывай ресурсы,\n' +
-            'сражайся с боссами и приводи друзей!\n\n' +
-            '🔗 ИСХОДНЫЙ КОД\n' +
-            'https://github.com/Yakov-hub-python/antichniy-grad-bot\n\n' +
-            '🙏 БЛАГОДАРНОСТИ\n' +
-            '• @KimiAntonelliF1DriverOficcial — за тестирование и поддержку\n' +
-            '• @MAMA_I_SUAY — за первый фидбек\n' +
-            '• всем игрокам — за вашу активность!\n\n' +
-            '📢 КАНАЛ И ЧАТ\n' +
-            'Канал: @antichniy_grad\n' +
-            'Чат: @antichniy_grad_chat'
+            'Строй, воюй, приводи друзей!'
         );
     });
-    bot.hears(['топ стрик', 'topstreak', 'стрик топ'], async (ctx) => {
-        // копируем логику из команды /topstreak
-        const db = readDB();
-        const sorted = Object.values(db.users)
-            .filter(u => u.dailyStreak && u.dailyStreak > 0)
-            .sort((a, b) => (b.dailyStreak || 0) - (a.dailyStreak || 0))
-            .slice(0, 10);
 
-        if (sorted.length === 0) {
-            return ctx.reply('📭 Пока никто не начал стрик.');
-        }
+    // ============================================================
+    // 1️⃣1️⃣ ОБУЧЕНИЕ
+    // ============================================================
 
-        let text = '📆 ТОП-10 ПО СТРИКУ:\n\n';
-        sorted.forEach((user, i) => {
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-            const name = user.nickname && user.nickname !== 'Игрок' 
-                ? user.nickname 
-                : user.username && user.username !== 'unknown' 
-                    ? '@' + user.username 
-                    : user.first_name || 'Игрок';
-            const streak = user.dailyStreak || 0;
-            text += `${medal} ${name} — ${streak} дней\n`;
-        });
-
-        await ctx.reply(text);
-    });
     bot.hears(['обучение', 'training', 'туториал', 'тренировка'], async (ctx) => {
         const userId = ctx.from.id;
         const user = getUser(userId);
@@ -602,14 +585,14 @@ module.exports = (bot) => {
         startTraining(user);
         const step = getFirstStep();
 
-        const text = 
+        const text =
             `📚 ОБУЧЕНИЕ: ШАГ 1 / 4\n\n` +
             `${step.title}\n${step.description}\n\n` +
-            `💡 ${step.hint}\n\n` +
             `🏆 Награда за выполнение: ${step.reward}💰\n\n` +
             `👉 Выполни действие и получи награду!`;
 
         saveUser(userId, user);
         await ctx.reply(text);
     });
+
 };

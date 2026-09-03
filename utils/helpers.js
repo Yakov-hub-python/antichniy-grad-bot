@@ -1,24 +1,28 @@
 const { getUser } = require('./storage');
-const { applyWeeklyBonus } = require('./events');
+const { BUILDING_INCOME, WEALTH_TAX, MAX_SOLDIERS } = require('../config/constants');
 
-
+// ===== VIP =====
 function isVIP(user) {
     return user.vip && user.vip.active && user.vip.expiresAt > Date.now();
 }
 
+// ===== ИНТЕРВАЛ ДОХОДА =====
 function getIncomeInterval(user) {
     const { INCOME_INTERVALS } = require('../config/constants');
     return isVIP(user) ? INCOME_INTERVALS.vip : INCOME_INTERVALS.regular;
 }
 
+// ===== СОЛДАТЫ =====
 function getSoldiers(user) {
     return user.soldiers || 0;
 }
 
+// ===== БОСС HP =====
 function getPersonalBossHP(user) {
-    return 1000 + (user.level - 1) * 1500; // ✅ Новый баланс
+    return 8000 + (user.level - 1) * 1500;
 }
 
+// ===== НАГРАДА ЗА БОССА =====
 function getBossReward(user) {
     const baseReward = 100 + user.level * 20;
     const soldierBonus = Math.floor((user.soldiers || 0) / 10) * 10;
@@ -27,138 +31,153 @@ function getBossReward(user) {
     return reward;
 }
 
-// ===== НОВЫЙ БАЛАНС =====
+// ============================================================
+// 1️⃣ УБЫВАЮЩАЯ ДОХОДНОСТЬ
+// ============================================================
+
+function getDiminishedIncome(base, count) {
+    if (count === 0) return 0;
+    let total = 0;
+    for (let i = 0; i < count; i++) {
+        total += base * Math.pow(0.98, i);
+    }
+    return Math.floor(total);
+}
+
+// ============================================================
+// 2️⃣ ПРОГРЕССИВНАЯ ЦЕНА
+// ============================================================
+
+function getProgressivePrice(basePrice, count) {
+    return Math.floor(basePrice * (1 + count * 0.15));
+}
+
+// ============================================================
+// 3️⃣ НАЛОГ НА БОГАТСТВО
+// ============================================================
+
+function applyWealthTax(user) {
+    if (!user || user.coins <= WEALTH_TAX.threshold) return 0;
+    const excess = user.coins - WEALTH_TAX.threshold;
+    const tax = Math.floor(excess * WEALTH_TAX.rate);
+    user.coins -= tax;
+    return tax;
+}
+
+// ============================================================
+// 4️⃣ РАСЧЁТ ДОХОДА
+// ============================================================
+
 function calculateIncome(user) {
     const buildings = user.buildings || {};
     const citizens = user.citizens || 5;
     const soldiers = user.soldiers || 0;
-    
-    // ============================================================
-    // 1️⃣ НУЖНО РАБОЧИХ
-    // ============================================================
-    
+
+    // ===== НУЖНО РАБОЧИХ =====
     const WORKERS_NEEDED = {
-        hut: 0,
-        farm: 1,
-        mine: 2,
-        mint: 1,
-        market: 1,
-        barracks: 0,
-        field: 2,
-        quarry: 3,
-        mint_factory: 2
+        hut: 0, house: 0, tavern: 1,
+        farm: 1, field: 2,
+        mine: 2, quarry: 3, iron_mine: 2,
+        mint: 1, mint_factory: 2, smelter: 2,
+        market: 1, bank: 1,
+        barracks: 0, forge: 0, walls: 0,
+        acropolis: 0, garden: 1
     };
-    
+
     let neededWorkers = 0;
     for (const [key, val] of Object.entries(buildings)) {
         neededWorkers += (WORKERS_NEEDED[key] || 0) * val;
     }
-    
-    // ============================================================
-    // 2️⃣ ЭФФЕКТИВНОСТЬ (от жителей)
-    // ============================================================
-    
+
     const workers = Math.min(citizens, neededWorkers);
     const efficiency = neededWorkers > 0 ? workers / neededWorkers : 1;
-    
-    // ============================================================
-    // 3️⃣ БАЗОВЫЙ ДОХОД (НОВЫЙ БАЛАНС)
-    // ============================================================
-    
-    let gold = (buildings.mine || 0) * 6 + (buildings.quarry || 0) * 75 + (buildings.market || 0) * 10;
-    let food = (buildings.farm || 0) * 3 + (buildings.field || 0) * 100;
-    let coins = (buildings.mint || 0) * 6 + (buildings.mint_factory || 0) * 250;
-    
-    // ============================================================
-    // 4️⃣ ПРИМЕНЯЕМ ЭФФЕКТИВНОСТЬ
-    // ============================================================
-    
+
+    // ===== БАЗОВЫЙ ДОХОД С УБЫВАЮЩЕЙ ДОХОДНОСТЬЮ =====
+    let gold = getDiminishedIncome(6, buildings.mine || 0) +
+               getDiminishedIncome(200, buildings.quarry || 0) +
+               (buildings.market || 0) * 10 +
+               (buildings.garden || 0) * 5;
+
+    let food = getDiminishedIncome(5, buildings.farm || 0) +
+               getDiminishedIncome(250, buildings.field || 0) +
+               (buildings.tavern || 0) * 1;
+
+    let coins = getDiminishedIncome(6, buildings.mint || 0) +
+                getDiminishedIncome(500, buildings.mint_factory || 0);
+
+    let iron = getDiminishedIncome(10, buildings.iron_mine || 0) +
+               getDiminishedIncome(50, buildings.smelter || 0);
+
+    // ===== БАНК (бонус к монетам) =====
+    if (buildings.bank) {
+        const bankBonus = buildings.bank * 0.05;
+        coins = Math.floor(coins * (1 + bankBonus));
+    }
+
+    // ===== КУЗНИЦА (урон солдатам) =====
+    if (buildings.forge) {
+        user.soldierDamage = (user.soldierDamage || 0) + buildings.forge;
+    }
+
+    // ===== ПРИМЕНЯЕМ ЭФФЕКТИВНОСТЬ =====
     gold = Math.floor(gold * efficiency);
     food = Math.floor(food * efficiency);
     coins = Math.floor(coins * efficiency);
+    iron = Math.floor(iron * efficiency);
 
-    
-    const { getEventMultiplier, isAcropolisActive } = require('./event_handlers');
-    const eventMultiplier = getEventMultiplier();
-    gold = Math.floor(gold * eventMultiplier);
-    food = Math.floor(food * eventMultiplier);
-    coins = Math.floor(coins * eventMultiplier);
-
-    if (isAcropolisActive(user)) {
-        gold = Math.floor(gold * 1.1);
-        food = Math.floor(food * 1.1);
-        coins = Math.floor(coins * 1.1);
-    }
-    // ===== ПРИМЕНЯЕМ ЕЖЕНЕВНЫЙ БОНУС =====
-    const incomeBeforeBonus = { gold, food, coins };
-    const bonusApplied = applyWeeklyBonus(incomeBeforeBonus, user);
-    gold = bonusApplied.gold;
-    food = bonusApplied.food;
-    coins = bonusApplied.coins;
-    // ============================================================
-    // 5️⃣ VIP БОНУС (+20%)
-    // ============================================================
-    
+    // ===== VIP БОНУС (+20%) =====
     if (isVIP(user)) {
         gold = Math.floor(gold * 1.2);
         food = Math.floor(food * 1.2);
         coins = Math.floor(coins * 1.2);
+        iron = Math.floor(iron * 1.2);
     }
-    
-    // ============================================================
-    // 6️⃣ ЖИТЕЛИ И СОЛДАТЫ ЕДЯТ ЕДУ (1 РАЗ ЗА СБОР)
-    // ============================================================
-    
-    // Каждый житель съедает 1 еду за сбор
+
+    // ===== АКРОПОЛЬ (+10%) =====
+    if (user.acropolisBuilt) {
+        gold = Math.floor(gold * 1.1);
+        food = Math.floor(food * 1.1);
+        coins = Math.floor(coins * 1.1);
+        iron = Math.floor(iron * 1.1);
+    }
+
+    // ===== ЕДА ДЛЯ ЖИТЕЛЕЙ И СОЛДАТ =====
     const foodForCitizens = citizens;
-    
-    // Каждый солдат съедает 0.5 еды за сбор
     const foodForSoldiers = soldiers * 0.5;
-    
     const totalFoodNeeded = foodForCitizens + foodForSoldiers;
-    
-    // Еда, которая останется после того, как жители и солдаты поедят
     const foodAfterEat = user.food + food - totalFoodNeeded;
-    
-    // ============================================================
-    // 7️⃣ ГОЛОДНЫЙ ШТРАФ (если еды не хватило)
-    // ============================================================
-    
+
     let deserters = 0;
     let finalFood = food;
-    
+
     if (foodAfterEat < 0) {
-        // Не хватило еды — штраф на доход
         const deficit = Math.abs(foodAfterEat);
         const penalty = Math.max(0.5, 1 - (deficit / (totalFoodNeeded + 1)) * 0.5);
-        
         gold = Math.floor(gold * penalty);
         coins = Math.floor(coins * penalty);
-        
-        // Дезертирство солдат (каждый 3 нехватки = 1 солдат уходит)
+        iron = Math.floor(iron * penalty);
         deserters = Math.floor(deficit / 3) + 1;
         if (deserters > user.soldiers) deserters = user.soldiers;
-        
-        // Обновляем солдат
         user.soldiers = Math.max(0, user.soldiers - deserters);
-        
-        // Еды не остаётся
         finalFood = 0;
     } else {
-        // Еды хватило — остаток сохраняется
         finalFood = Math.floor(foodAfterEat);
     }
-    
-    // ============================================================
-    // 8️⃣ ВОЗВРАЩАЕМ
-    // ============================================================
-    
+
+    // ===== НАЛОГ НА БОГАТСТВО =====
+    const tax = applyWealthTax(user);
+    if (tax > 0) {
+        console.log(`💰 Налог: ${tax} монет у пользователя ${user.id}`);
+    }
+
     return {
         gold: Math.floor(gold),
         food: Math.floor(finalFood),
         coins: Math.floor(coins),
-        deserters: deserters,
-        foodEaten: Math.floor(totalFoodNeeded)
+        iron: Math.floor(iron),
+        deserters,
+        foodEaten: Math.floor(totalFoodNeeded),
+        tax
     };
 }
 
@@ -168,5 +187,8 @@ module.exports = {
     getSoldiers,
     getPersonalBossHP,
     getBossReward,
+    getDiminishedIncome,
+    getProgressivePrice,
+    applyWealthTax,
     calculateIncome
 };
