@@ -62,7 +62,25 @@ module.exports = {
             user.acropolisBuilt = true;
             user.acropolisBuiltDate = Date.now();
         }
-
+        // ===== НОВЫЕ ЗДАНИЯ =====
+        if (type === 'bank') {
+            // Бонус уже в calculateIncome, ничего не делаем
+        }
+        if (type === 'garden') {
+            // Бонус уже в calculateIncome, ничего не делаем
+        }
+        if (type === 'walls') {
+            user.walls = (user.walls || 0) + 1;
+        }
+        if (type === 'forge') {
+            user.soldierDamage = (user.soldierDamage || 0) + 1;
+        }
+        if (type === 'iron_mine') {
+            // Бонус уже в calculateIncome, ничего не делаем
+        }
+        if (type === 'smelter') {
+            // Бонус уже в calculateIncome, ничего не делаем
+        }
         // ===== ОБНОВЛЯЕМ УРОВЕНЬ =====
         const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
         user.level = totalBuildings + 1;
