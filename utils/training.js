@@ -1,3 +1,7 @@
+// ============================================================
+// ОБУЧЕНИЕ ДЛЯ НОВИЧКОВ (ОНБОРДИНГ)
+// ============================================================
+
 const TRAINING_STEPS = [
     {
         id: 1,
@@ -5,8 +9,7 @@ const TRAINING_STEPS = [
         description: 'Построй хижину, чтобы появились жители.',
         action: 'build_hut',
         reward: 20,
-        next: 2,
-        hint: 'Напиши в чате: "построить хижину" или нажми на кнопку "🏗️ Строить" в городе.'
+        next: 2
     },
     {
         id: 2,
@@ -14,8 +17,7 @@ const TRAINING_STEPS = [
         description: 'Построй ферму, чтобы жители не голодали.',
         action: 'build_farm',
         reward: 25,
-        next: 3,
-        hint: 'Напиши в чате: "построить ферму" или нажми на кнопку "🏗️ Строить" в городе.'
+        next: 3
     },
     {
         id: 3,
@@ -23,8 +25,7 @@ const TRAINING_STEPS = [
         description: 'Построй шахту, чтобы получать золото.',
         action: 'build_mine',
         reward: 30,
-        next: 4,
-        hint: 'Напиши в чате: "построить шахту" или нажми на кнопку "🏗️ Строить" в городе.'
+        next: 4
     },
     {
         id: 4,
@@ -32,8 +33,7 @@ const TRAINING_STEPS = [
         description: 'Собери доход — получи ресурсы.',
         action: 'collect_income',
         reward: 40,
-        next: null,
-        hint: 'Напиши в чате: "собрать доход" или нажми на кнопку "💰 Собрать доход".'
+        next: null
     }
 ];
 
@@ -75,11 +75,11 @@ function advanceTraining(user, action) {
     return null;
 }
 
-module.exports = { 
-    TRAINING_STEPS, 
-    getTrainingStep, 
-    getFirstStep, 
-    isTrainingComplete, 
-    startTraining, 
-    advanceTraining 
+module.exports = {
+    TRAINING_STEPS,
+    getTrainingStep,
+    getFirstStep,
+    isTrainingComplete,
+    startTraining,
+    advanceTraining
 };

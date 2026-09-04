@@ -3,6 +3,7 @@ const { BUILDING_COSTS, BUILDING_NAMES, MAX_BUILDINGS } = require('../config/con
 const { getProgressivePrice, getDiminishedIncome } = require('../utils/helpers');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
+const { advanceTraining } = require('../utils/training');
 const city = require('../hears/city');
 
 module.exports = {
@@ -62,28 +63,34 @@ module.exports = {
             user.acropolisBuilt = true;
             user.acropolisBuiltDate = Date.now();
         }
-        // ===== НОВЫЕ ЗДАНИЯ =====
-        if (type === 'bank') {
-            // Бонус уже в calculateIncome, ничего не делаем
-        }
-        if (type === 'garden') {
-            // Бонус уже в calculateIncome, ничего не делаем
-        }
         if (type === 'walls') {
             user.walls = (user.walls || 0) + 1;
         }
         if (type === 'forge') {
             user.soldierDamage = (user.soldierDamage || 0) + 1;
         }
-        if (type === 'iron_mine') {
-            // Бонус уже в calculateIncome, ничего не делаем
-        }
-        if (type === 'smelter') {
-            // Бонус уже в calculateIncome, ничего не делаем
-        }
+
         // ===== ОБНОВЛЯЕМ УРОВЕНЬ =====
         const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
         user.level = totalBuildings + 1;
+
+        // ===== ОБУЧЕНИЕ =====
+        if (type === 'hut' || type === 'farm' || type === 'mine') {
+            const trainingResult = advanceTraining(user, 'build_' + type);
+            if (trainingResult) {
+                if (trainingResult.completed) {
+                    await ctx.reply(`🎉 ОБУЧЕНИЕ ЗАВЕРШЕНО!\n🏆 Награда: ${trainingResult.step.reward}💰\n\nТы готов к игре! 🏛️`);
+                } else {
+                    const nextStep = trainingResult.nextStep;
+                    await ctx.reply(
+                        `✅ Шаг ${trainingResult.step.id} выполнен!\n💰 +${trainingResult.step.reward} золота\n\n` +
+                        `📚 СЛЕДУЮЩИЙ ШАГ:\n${nextStep.title}\n${nextStep.description}\n\n` +
+                        `🏆 Награда: ${nextStep.reward}💰`
+                    );
+                }
+                saveUser(userId, user);
+            }
+        }
 
         // ===== КВЕСТЫ =====
         const questResult = updateQuestProgress(user, 'build', 1);

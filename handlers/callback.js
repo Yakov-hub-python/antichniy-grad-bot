@@ -74,7 +74,10 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         await require('../hears/daily').get(ctx);
     });
-
+    bot.action('about_show', async (ctx) => {
+        await ctx.answerCbQuery();
+        await require('../hears/about').show(ctx);
+    });
     bot.action('barracks_show', async (ctx) => {
         await ctx.answerCbQuery();
         const user = getUser(ctx.from.id);
@@ -98,27 +101,5 @@ module.exports = (bot) => {
     bot.action('olymp_show', async (ctx) => {
         await ctx.answerCbQuery();
         await require('../hears/olymp').show(ctx);
-    });
-
-    bot.action('about_show', async (ctx) => {
-        await ctx.answerCbQuery();
-        await ctx.reply(
-            '🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n' +
-            'Версия: 1.5.1\n' +
-            'Разработчик: @DEDAYSON (https://t.me/DEDAYSON)\n\n' +
-            '📖 О ПРОЕКТЕ\n' +
-            'Экономическая стратегия в Telegram.\n' +
-            'Строй свой город, добывай ресурсы,\n' +
-            'сражайся с боссами и приводи друзей!\n\n' +
-            '🔗 ИСХОДНЫЙ КОД\n' +
-            'https://github.com/Yakov-hub-python/antichniy-grad-bot\n\n' +
-            '🙏 БЛАГОДАРНОСТИ\n' +
-            '• @KimiAntonelliF1DriverOficcial — за тестирование и поддержку\n' +
-            '• @MAMA_I_SUAY — за первый фидбек\n' +
-            '• всем игрокам — за вашу активность!\n\n' +
-            '📢 КАНАЛ И ЧАТ\n' +
-            'Канал: @antichniy_grad\n' +
-            'Чат: @antichniy_grad_chat'
-        );
     });
 };

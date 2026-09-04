@@ -13,11 +13,11 @@ const BUILDING_COSTS = {
     field: { gold: 0, coins: 1000, iron: 0, level: 5 },
     
     // ===== ДОБЫВАЮЩИЕ =====
-    mine: { gold: 60, coins: 0, iron: 0, level: 1 },
+    mine: { gold: 40, coins: 0, iron: 0, level: 1 },
     quarry: { gold: 0, coins: 750, iron: 0, level: 3 },
     
     // ===== ПРОИЗВОДСТВЕННЫЕ =====
-    mint: { gold: 120, coins: 0, iron: 0, level: 1 },
+    mint: { gold: 80, coins: 0, iron: 0, level: 1 },
     mint_factory: { gold: 0, coins: 5000, iron: 0, level: 10 },
     
     // ===== ТОРГОВЫЕ =====
