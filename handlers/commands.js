@@ -4,6 +4,9 @@ const { getSoldiers } = require('../utils/helpers');
 const fs = require('fs');
 const path = require('path');
 const { showMainMenu } = require('../handlers/menu');
+const branchHandler = require('./branch');
+const portHandlers = require('./port');
+const miracle = require('./miracle');
 
 // ===== ПРОВЕРКА АДМИНА С ЛОГИРОВАНИЕМ =====
 function isAdmin(userId) {
@@ -50,32 +53,17 @@ module.exports = (bot) => {
 
     // ===== /REFERRAL =====
     bot.command('referral', require('../hears/referral').show);
-    // ===== ТОП ПО СТРИКУ =====
-    bot.command('topstreak', async (ctx) => {
-        const db = readDB();
-        const sorted = Object.values(db.users)
-            .filter(u => u.dailyStreak && u.dailyStreak > 0)
-            .sort((a, b) => (b.dailyStreak || 0) - (a.dailyStreak || 0))
-            .slice(0, 10);
 
-        if (sorted.length === 0) {
-            return ctx.reply('📭 Пока никто не начал стрик.');
-        }
+    // Ветви развития
+    bot.command('branch', branchHandler);
+    bot.command('miracle', miracle)
+    // Работа с портом
+    bot.command('port', portHandlers.port);
+    bot.command('sell_port', portHandlers.sell_port);
+    bot.command('buy_port', portHandlers.buy_port);
+    bot.command('my_offers', portHandlers.my_offers);
+    bot.command('cancel_offer', portHandlers.cancel_offer);
 
-        let text = '📆 ТОП-10 ПО СТРИКУ:\n\n';
-        sorted.forEach((user, i) => {
-            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-            const name = user.nickname && user.nickname !== 'Игрок' 
-                ? user.nickname 
-                : user.username && user.username !== 'unknown' 
-                    ? '@' + user.username 
-                    : user.first_name || 'Игрок';
-            const streak = user.dailyStreak || 0;
-            text += `${medal} ${name} — ${streak} дней\n`;
-        });
-
-        await ctx.reply(text);
-    });
     // ===== ОБУЧЕНИЕ =====
     bot.command('training', async (ctx) => {
         const userId = ctx.from.id;
@@ -93,7 +81,6 @@ module.exports = (bot) => {
         const text = 
             `📚 ОБУЧЕНИЕ: ШАГ 1 / 4\n\n` +
             `${step.title}\n${step.description}\n\n` +
-            `💡 ${step.hint}\n\n` +
             `🏆 Награда за выполнение: ${step.reward}💰\n\n` +
             `👉 Выполни действие и получи награду!`;
 
@@ -214,6 +201,10 @@ module.exports = (bot) => {
 
     // ===== /SELL =====
     bot.command('sell', async (ctx) => {
+        const user = getUser(ctx.from.id)
+        if ((user.techTree?.economy || 0) < 1) {
+            return ctx.reply('❌ Торговля доступна только после изучения 1 уровня экономики.');
+        }
         const args = ctx.message.text.split(' ');
         if (args.length < 3) {
             return ctx.reply('❌ Используй: /sell food 10');
@@ -223,7 +214,6 @@ module.exports = (bot) => {
         if (isNaN(amount) || amount <= 0) {
             return ctx.reply('❌ Введи положительное число.');
         }
-        const user = getUser(ctx.from.id);
         const prices = { food: 1, coins: 3 };
         if (!prices[resource]) {
             return ctx.reply('❌ Можно продать только food или coins.');
@@ -239,6 +229,10 @@ module.exports = (bot) => {
 
     // ===== /BUY =====
     bot.command('buy', async (ctx) => {
+        const user = getUser(ctx.from.id)
+        if ((user.techTree?.economy || 0) < 1) {
+            return ctx.reply('❌ Торговля доступна только после изучения 1 уровня экономики.');
+        }
         const args = ctx.message.text.split(' ');
         if (args.length < 3) {
             return ctx.reply('❌ Используй: /buy food 10');
@@ -248,7 +242,6 @@ module.exports = (bot) => {
         if (isNaN(amount) || amount <= 0) {
             return ctx.reply('❌ Введи положительное число.');
         }
-        const user = getUser(ctx.from.id);
         const prices = { food: 2, coins: 6 };
         if (!prices[resource]) {
             return ctx.reply('❌ Можно купить только food или coins.');
@@ -398,7 +391,8 @@ module.exports = (bot) => {
             `/give_all <ресурс> <кол-во> — выдать всем\n` +
             `/list_users — список всех игроков\n` +
             `/delete_user @user — удалить игрока\n` +
-            `/reset_user @user — сбросить игрока\n\n` +
+            `/reset_user @user — сбросить игрока\n` +
+            `/recalc_level — восстановление уровня\n\n`+
 
             `📢 РАССЫЛКА:\n` +
             `/say текст — сообщение всем игрокам\n\n` +
@@ -414,6 +408,32 @@ module.exports = (bot) => {
         )
     });
 
+    // /recalc_level — пересчитать уровень всем игрокам
+    bot.command('recalc_level', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) return ctx.reply('⛔ Нет прав.');
+        const db = readDB();
+        let count = 0;
+        for (const id in db.users) {
+            const user = db.users[id];
+            let changed = false;
+            // Заменяем null на 0
+            for (const key in user.buildings) {
+                if (user.buildings[key] === null) {
+                    user.buildings[key] = 0;
+                    changed = true;
+                }
+            }
+            const total = Object.values(user.buildings).reduce((a, b) => a + b, 0);
+            const newLevel = total + 1;
+            if (user.level !== newLevel) {
+                user.level = newLevel;
+                changed = true;
+            }
+            if (changed) count++;
+        }
+        writeDB(db);
+        ctx.reply(`✅ Уровень пересчитан для ${count} игроков.`);
+    });
     // ===== /STATS — СТАТИСТИКА БОТА =====
     bot.command('stats', async (ctx) => {
         if (!isAdmin(ctx.from.id)) {
@@ -672,22 +692,77 @@ module.exports = (bot) => {
         for (const id in db.users) {
             if (db.users[id].username === username) {
                 userId = id;
-                db.users[id].gold = 200;
-                db.users[id].food = 0;
-                db.users[id].coins = 0;
-                db.users[id].citizens = 5;
-                db.users[id].soldiers = 0;
-                db.users[id].level = 1;
-                db.users[id].buildings = { hut: 0, farm: 0, mine: 0, mint: 0, market: 0, barracks: 0 };
-                db.users[id].lastIncome = Date.now();
-                db.users[id].lastDaily = null;
-                db.users[id].vip = { active: false, expiresAt: 0 };
-                db.users[id].referrals = [];
-                db.users[id].referredBy = null;
-                db.users[id].referralCompleted = false;
-                db.users[id].bossKills = 0;
-                db.users[id].totalDamage = 0;
-                db.users[id].personalBoss = { hp: 5000, maxHp: 5000, respawnAt: 0, kills: 0 };
+                const user = db.users[id];
+                
+                // Сброс ресурсов
+                user.gold = 200;
+                user.food = 0;
+                user.coins = 0;
+                user.citizens = 5;
+                user.soldiers = 0;
+                user.level = 1;
+                user.dailyStreak = 0;
+                
+                // Сброс зданий (полный список)
+                user.buildings = {
+                    hut: 0,
+                    farm: 0,
+                    mine: 0,
+                    mint: 0,
+                    market: 0,
+                    barracks: 0,
+                    field: 0,
+                    quarry: 0,
+                    mint_factory: 0,
+                    house: 0,
+                    tavern: 0,
+                    bank: 0,
+                    garden: 0,
+                    walls: 0,
+                    forge: 0,
+                    iron_mine: 0,
+                    smelter: 0,
+                    acropolis: 0
+                };
+                
+                // Сброс времени
+                user.lastIncome = Date.now();
+                user.lastDaily = null;
+                
+                // Сброс VIP
+                user.vip = { active: false, expiresAt: 0 };
+                
+                // Сброс рефералов
+                user.referrals = [];
+                user.referredBy = null;
+                user.referralCompleted = false;
+                
+                // Сброс боссов
+                user.bossKills = 0;
+                user.totalDamage = 0;
+                user.personalBoss = { hp: 5000, maxHp: 5000, respawnAt: 0, kills: 0 };
+                
+                // Сброс достижений
+                user.achievements = {};
+                
+                // Сброс обучения
+                user.training = { currentStep: 1, completed: false };
+                
+                // Сброс технологических деревьев
+                user.techTree = { economy: 0, army: 0, culture: 0 };
+                user.techTreeLastUpgrade = { economy: 0, army: 0, culture: 0 };
+                
+                // Сброс новых ресурсов
+                user.iron = 0;
+                user.metal = 0;
+                user.buildingLevels = {};
+                user.soldierDamage = 0;
+                
+                // (Опционально) сброс активной способности, если есть
+                user.lastMiracle = 0;
+                user.miracleActive = false;
+                user.miracleExpiresAt = 0;
+                
                 found = true;
                 break;
             }
@@ -702,8 +777,7 @@ module.exports = (bot) => {
         console.log(`🔄 [RESET_USER] @${username} (${userId}) сброшен админом ${ctx.from.id}`);
         await ctx.reply(`✅ @${username} сброшен до начального состояния`);
     });
-
-    // ===== /BACKUP =====
+    // ===== /BACKUP (обновлённый) =====
     bot.command('backup', async (ctx) => {
         if (!isAdmin(ctx.from.id)) {
             console.log(`⛔ [BACKUP] Доступ запрещен для ${ctx.from.id}`);
@@ -713,8 +787,19 @@ module.exports = (bot) => {
         console.log(`📦 [BACKUP] Создание бекапа от ${ctx.from.id}`);
         
         try {
+            // Читаем обе базы
             const db = readDB();
-            const json = JSON.stringify(db, null, 2);
+            const offers = require('../utils/portStorage').readOffers();
+            
+            // Формируем единый объект бекапа
+            const backupData = {
+                database: db,
+                offers: offers,
+                version: '1.6.1',
+                createdAt: new Date().toISOString()
+            };
+            
+            const json = JSON.stringify(backupData, null, 2);
             const filename = `backup_${new Date().toISOString().slice(0,10)}.json`;
             
             await ctx.replyWithDocument({
@@ -725,6 +810,7 @@ module.exports = (bot) => {
             console.log(`✅ [BACKUP] Бекап отправлен: ${filename} (${json.length} символов)`);
             await ctx.reply(
                 `✅ Бекап создан!\n` +
+                `📦 Включает: database.json + offers.json\n` +
                 `📌 Чтобы восстановить: ответьте на это сообщение командой /restore`
             );
         } catch (err) {
@@ -732,85 +818,95 @@ module.exports = (bot) => {
             await ctx.reply('❌ Ошибка при создании бекапа');
         }
     });
-
-    // ===== /RESTORE =====
+    // ===== /RESTORE (обновлённый) =====
     bot.command('restore', async (ctx) => {
-        // 1. Проверка прав
         if (!isAdmin(ctx.from.id)) {
             return ctx.reply('⛔ Доступ запрещен.');
         }
 
         console.log(`📥 [RESTORE] Начало восстановления от ${ctx.from.id}`);
 
-        // 2. Проверяем, что это ответ на сообщение
         const repliedMsg = ctx.message.reply_to_message;
         if (!repliedMsg) {
-            console.log('⚠️ [RESTORE] Не ответ на сообщение');
             return ctx.reply(
                 '❌ Ответьте на сообщение с файлом бекапа.\n' +
                 'Пример: отправьте /backup, а затем ответьте на его сообщение /restore'
             );
         }
 
-        // 3. Проверяем, что в исходном сообщении есть документ
         if (!repliedMsg.document) {
-            console.log('⚠️ [RESTORE] В сообщении нет файла');
             return ctx.reply('❌ В сообщении, на которое вы ответили, нет файла.');
         }
 
         const file = repliedMsg.document;
         if (!file.file_name.endsWith('.json')) {
-            console.log(`⚠️ [RESTORE] Не JSON: ${file.file_name}`);
             return ctx.reply('❌ Файл должен быть в формате .json');
         }
 
         console.log(`📄 [RESTORE] Файл: ${file.file_name} (${file.file_size} байт)`);
 
         try {
-            // 4. Скачиваем файл
-            console.log('⬇️ [RESTORE] Скачивание файла...');
             const fileLink = await ctx.telegram.getFileLink(file.file_id);
             const response = await fetch(fileLink);
             const jsonText = await response.text();
-            console.log(`✅ [RESTORE] Файл скачан (${jsonText.length} символов)`);
 
-            // 5. Парсим JSON
             let backupData;
             try {
                 backupData = JSON.parse(jsonText);
             } catch (parseErr) {
-                console.log('❌ [RESTORE] Ошибка парсинга JSON');
                 return ctx.reply('❌ Файл поврежден или это невалидный JSON.');
             }
 
-            // 6. Проверяем структуру
-            if (!backupData.users || typeof backupData.users !== 'object') {
-                console.log('❌ [RESTORE] Неверная структура: нет ключа "users"');
-                return ctx.reply(
-                    '❌ Файл не соответствует структуре базы данных.\n' +
-                    'Ожидается ключ "users" с объектом пользователей.'
-                );
+            // Определяем формат бекапа
+            let dbData, offersData;
+            if (backupData.database && backupData.offers) {
+                // Новый формат (1.6.1+)
+                dbData = backupData.database;
+                offersData = backupData.offers;
+                console.log('📌 [RESTORE] Обнаружен новый формат бекапа (database + offers)');
+            } else if (backupData.users) {
+                // Старый формат (только users)
+                dbData = {
+                    users: backupData.users,
+                    globalBoss: backupData.globalBoss || { hp: 5000, maxHp: 5000, active: false, participants: [] },
+                    promocodes: backupData.promocodes || {}
+                };
+                offersData = { offers: [] };
+                console.log('📌 [RESTORE] Обнаружен старый формат бекапа (только users). Порт будет очищен.');
+                await ctx.reply('📌 Обнаружен старый формат бекапа. Порт будет очищен.');
+            } else {
+                return ctx.reply('❌ Неизвестный формат бекапа. Ожидается ключ "users" или "database".');
             }
 
-            const userCount = Object.keys(backupData.users).length;
-            console.log(`👥 [RESTORE] В бекапе ${userCount} пользователей`);
+            const userCount = Object.keys(dbData.users || {}).length;
+            const offersCount = offersData.offers ? offersData.offers.length : 0;
+            console.log(`👥 [RESTORE] В бекапе ${userCount} пользователей и ${offersCount} лотов`);
 
-            // 7. Делаем резервную копию текущей БД
-            const DB_FILE = 'database.json';
-            if (fs.existsSync(DB_FILE)) {
-                const backupName = `database_auto_backup_${Date.now()}.json`;
-                fs.copyFileSync(DB_FILE, backupName);
+            // Резервные копии текущих файлов
+            const timestamp = Date.now();
+            if (fs.existsSync('database.json')) {
+                const backupName = `database_auto_backup_${timestamp}.json`;
+                fs.copyFileSync('database.json', backupName);
                 console.log(`📀 [RESTORE] Создана копия: ${backupName}`);
-                await ctx.reply(`📀 Создана резервная копия текущей базы: ${backupName}`);
+            }
+            if (fs.existsSync('offers.json')) {
+                const backupName = `offers_auto_backup_${timestamp}.json`;
+                fs.copyFileSync('offers.json', backupName);
+                console.log(`📀 [RESTORE] Создана копия: ${backupName}`);
             }
 
-            // 8. Восстанавливаем базу (перезаписываем)
-            writeDB(backupData);
-            console.log(`✅ [RESTORE] База восстановлена (${userCount} пользователей)`);
+            // Восстанавливаем
+            writeDB(dbData);
+            const { writeOffers } = require('../utils/portStorage');
+            writeOffers(offersData);
+
+            console.log(`✅ [RESTORE] Базы восстановлены (${userCount} пользователей, ${offersCount} лотов)`);
 
             await ctx.reply(
-                `✅ База данных восстановлена из файла ${file.file_name}!\n` +
-                `👥 Количество пользователей: ${userCount}`
+                `✅ Базы данных восстановлены из файла ${file.file_name}!\n` +
+                `👥 Пользователей: ${userCount}\n` +
+                `📦 Лотов в порту: ${offersCount}\n` +
+                `📀 Созданы резервные копии: database_auto_backup_${timestamp}.json, offers_auto_backup_${timestamp}.json`
             );
 
         } catch (error) {

@@ -21,7 +21,7 @@ const BUILDING_COSTS = {
     mint_factory: { gold: 0, coins: 5000, iron: 0, level: 10 },
     
     // ===== ТОРГОВЫЕ =====
-    bank: { gold: 0, coins: 500, iron: 0, level: 10 },
+    bank:{ gold: 0, coins: 500, iron: 0, level: 10, economyLevel: 2 },
     // ===== ОСОБЫЕ =====
     acropolis: { gold: 0, coins: 500, iron: 0, level: 5 },
 };
@@ -146,6 +146,27 @@ const INCOME_INTERVALS = {
 };
 
 // ============================================================
+// Ветви, пока только экономика
+// ============================================================
+const TECH_TREE = {
+    economy: {
+        name: '🏛️ Экономика',
+        levels: {
+            1: { cost: { gold: 1000, coins: 0 }, requirements: { level: 5 }, cooldown: 3600000, unlocks: ['market'], bonus: { incomeMultiplier: 1.00 } },
+            2: { cost: { gold: 2500, coins: 50 }, requirements: { level: 10 }, cooldown: 720000, unlocks: ['bank'], bonus: { incomeMultiplier: 1.05 } },
+            3: { cost: { gold: 5000, coins: 100 }, requirements: { level: 15 }, cooldown: 1000, unlocks: ['port'], bonus: { incomeMultiplier: 1.10 } },
+            4: { cost: { gold: 10000, coins: 200 }, requirements: { level: 20 }, cooldown: 21600000, unlocks: ['tax_break'], bonus: { taxReduction: 0.10 } },
+            5: { cost: { gold: 20000, coins: 500 }, requirements: { level: 25 }, cooldown: 28800000, unlocks: ['trade_route'], bonus: { sellBonus: 1.15 } },
+            6: { cost: { gold: 40000, coins: 1000 }, requirements: { level: 30 }, cooldown: 43200000, unlocks: ['factory'], bonus: { incomeMultiplier: 1.20 } },
+            7: { cost: { gold: 80000, coins: 2000 }, requirements: { level: 35 }, cooldown: 57600000, unlocks: ['guild'], bonus: { incomeMultiplier: 1.25 } },
+            8: { cost: { gold: 160000, coins: 4000 }, requirements: { level: 40 }, cooldown: 72000000, unlocks: ['mint_house'], bonus: { coinMultiplier: 1.20 } },
+            9: { cost: { gold: 320000, coins: 8000 }, requirements: { level: 45 }, cooldown: 86400000, unlocks: ['economic_miracle'], bonus: { incomeMultiplier: 1.30, activeAbility: 'economic_miracle' } },
+            10: { cost: { gold: 640000, coins: 16000 }, requirements: { level: 50 }, cooldown: 172800000, unlocks: ['financial_empire'], bonus: { incomeMultiplier: 1.50 } }
+        }
+    }
+};
+
+// ============================================================
 // 9️⃣ НАЛОГ НА БОГАТСТВО
 // ============================================================
 
@@ -186,4 +207,5 @@ module.exports = {
     INCOME_INTERVALS,
     WEALTH_TAX,
     MAIN_MENU,
+    TECH_TREE
 };

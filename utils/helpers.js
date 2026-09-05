@@ -1,5 +1,5 @@
 const { getUser } = require('./storage');
-const { BUILDING_INCOME, WEALTH_TAX, MAX_SOLDIERS } = require('../config/constants');
+const { WEALTH_TAX,TECH_TREE } = require('../config/constants');
 
 // ===== VIP =====
 function isVIP(user) {
@@ -94,19 +94,19 @@ function calculateIncome(user) {
 
     // ===== БАЗОВЫЙ ДОХОД С УБЫВАЮЩЕЙ ДОХОДНОСТЬЮ =====
     let gold = getDiminishedIncome(6, buildings.mine || 0) +
-               getDiminishedIncome(200, buildings.quarry || 0) +
-               (buildings.market || 0) * 10 +
-               (buildings.garden || 0) * 5;
+        getDiminishedIncome(200, buildings.quarry || 0) +
+        (buildings.market || 0) * 10 +
+        (buildings.garden || 0) * 5;
 
     let food = getDiminishedIncome(5, buildings.farm || 0) +
-               getDiminishedIncome(250, buildings.field || 0) +
-               (buildings.tavern || 0) * 1;
+        getDiminishedIncome(250, buildings.field || 0) +
+        (buildings.tavern || 0) * 1;
 
     let coins = getDiminishedIncome(6, buildings.mint || 0) +
-                getDiminishedIncome(500, buildings.mint_factory || 0);
+        getDiminishedIncome(500, buildings.mint_factory || 0);
 
     let iron = getDiminishedIncome(10, buildings.iron_mine || 0) +
-               getDiminishedIncome(50, buildings.smelter || 0);
+        getDiminishedIncome(50, buildings.smelter || 0);
 
     // ===== БАНК (бонус к монетам) =====
     if (buildings.bank) {
@@ -169,7 +169,24 @@ function calculateIncome(user) {
     if (tax > 0) {
         console.log(`💰 Налог: ${tax} монет у пользователя ${user.id}`);
     }
-
+    const ecoLevel = user.techTree?.economy || 0;
+    if (ecoLevel > 0) {
+        const ecoBonus = TECH_TREE.economy.levels[ecoLevel]?.bonus?.incomeMultiplier || 1;
+        gold = Math.floor(gold * ecoBonus);
+        coins = Math.floor(coins * (TECH_TREE.economy.levels[ecoLevel]?.bonus?.coinMultiplier || 1));
+    }
+    // Проверяем, активна ли способность
+    const now = Date.now();
+    if (user.miracleActive && user.miracleExpiresAt && now < user.miracleExpiresAt) {
+        gold = Math.floor(gold * 1.3);
+        food = Math.floor(food * 1.3);
+        coins = Math.floor(coins * 1.3);
+        iron = Math.floor(iron * 1.3);
+    } else if (user.miracleActive && user.miracleExpiresAt && now >= user.miracleExpiresAt) {
+        // Автоматически отключаем после истечения
+        user.miracleActive = false;
+        user.miracleExpiresAt = 0;
+    }
     return {
         gold: Math.floor(gold),
         food: Math.floor(finalFood),

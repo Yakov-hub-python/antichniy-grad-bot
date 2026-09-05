@@ -6,7 +6,7 @@ const TRAINING_STEPS = [
     {
         id: 1,
         title: '🏠 Первый шаг',
-        description: 'Построй хижину, чтобы появились жители.',
+        description: 'Построй хижину, чтобы появились жители. Напиши /city или город, и нажми на кнопку строительство, потом хижина',
         action: 'build_hut',
         reward: 20,
         next: 2
@@ -30,7 +30,7 @@ const TRAINING_STEPS = [
     {
         id: 4,
         title: '💰 Сбор дохода',
-        description: 'Собери доход — получи ресурсы.',
+        description: 'Собери доход — получи ресурсы. Нажми "Собрать доход" в городе',
         action: 'collect_income',
         reward: 40,
         next: null

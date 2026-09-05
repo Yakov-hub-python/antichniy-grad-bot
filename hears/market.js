@@ -8,7 +8,9 @@ const PRICES = {
 
 async function showMarketMenu(ctx) {
     const user = getUser(ctx.from.id);
-
+    if ((user.techTree?.economy || 0) < 1) {
+        return ctx.reply('❌ Торговля доступна только после изучения 1 уровня экономики.');
+    }
     await ctx.reply(
         `🏪 РЫНОК\n\n` +
         `💰 Золото: ${user.gold}\n` +
@@ -36,7 +38,9 @@ async function sellResource(ctx, resource) {
     const user = getUser(ctx.from.id);
     const price = PRICES.sell[resource];
     const amount = 1;
-
+    if ((user.techTree?.economy || 0) < 1) {
+        return ctx.reply('❌ Торговля доступна только после изучения 1 уровня экономики.');
+    }
     if (!price) return ctx.reply('❌ Такого ресурса нет.');
     if ((user[resource] || 0) < amount) {
         return ctx.reply(`❌ У тебя только ${user[resource] || 0} ${resource}.`);
@@ -55,7 +59,9 @@ async function buyResource(ctx, resource) {
     const user = getUser(ctx.from.id);
     const price = PRICES.buy[resource];
     const amount = 1;
-
+    if ((user.techTree?.economy || 0) < 1) {
+        return ctx.reply('❌ Торговля доступна только после изучения 1 уровня экономики.');
+    }
     if (!price) return ctx.reply('❌ Такого ресурса нет.');
     const cost = amount * price;
     if (user.gold < cost) {

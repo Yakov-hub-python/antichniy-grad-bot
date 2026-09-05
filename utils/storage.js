@@ -75,6 +75,8 @@ function getUser(id) {
             referralCompleted: false,
             bossKills: 0,
             totalDamage: 0,
+            techTree: { economy: 0 },
+            techTreeLastUpgrade: { economy: 0 },
             personalBoss: {
                 hp: 5000,
                 maxHp: 5000,

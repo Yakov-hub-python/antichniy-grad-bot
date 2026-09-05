@@ -4,6 +4,7 @@ const { showMainMenu } = require('../handlers/menu');
 const { updateQuestProgress } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 const { startTraining, getFirstStep } = require('../utils/training');
+
 module.exports = async (ctx) => {
     const userId = ctx.from.id;
     const text = ctx.message.text;
@@ -95,7 +96,6 @@ module.exports = async (ctx) => {
             `🏛️ ДОБРО ПОЖАЛОВАТЬ, ${ctx.from.first_name.toUpperCase()}!\n\n` +
             `📚 ОБУЧЕНИЕ: ШАГ 1 / 4\n\n` +
             `${step.title}\n${step.description}\n\n` +
-            `💡 ${step.hint}\n\n` +
             `🏆 Награда: ${step.reward}💰\n\n` +
             `💰 Золото: ${user.gold}\n` +
             `🏗️ Уровень: ${user.level}\n` +

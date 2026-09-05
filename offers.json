@@ -1,0 +1,28 @@
+{
+  "offers": [
+    {
+      "id": "offer_1788627715917_cdd7",
+      "sellerId": 5685152704,
+      "resource": "food",
+      "amount": 10,
+      "pricePerUnit": 2,
+      "totalPrice": 20,
+      "currency": "gold",
+      "createdAt": 1788627715917,
+      "expiresAt": 1788800515917,
+      "status": "cancelled"
+    },
+    {
+      "id": "offer_1788628451945_uf5l",
+      "sellerId": 5685152704,
+      "resource": "coins",
+      "amount": 100,
+      "pricePerUnit": 1,
+      "totalPrice": 100,
+      "currency": "gold",
+      "createdAt": 1788628451945,
+      "expiresAt": 1788801251945,
+      "status": "sold"
+    }
+  ]
+}

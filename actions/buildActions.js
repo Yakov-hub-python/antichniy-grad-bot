@@ -17,7 +17,11 @@ module.exports = {
         if (!baseCost) {
             return ctx.reply('❌ Неизвестное здание.');
         }
-
+        // ===== ПРОВЕРКА ВЕТКИ ЭКОНОМИКИ =====
+        const requiredEconomy = baseCost.economyLevel || 0;
+        if (requiredEconomy > 0 && (user.techTree?.economy || 0) < requiredEconomy) {
+            return ctx.reply(`❌ Это здание открывается на ${requiredEconomy} уровне ветки экономики. Твой уровень: ${user.techTree?.economy || 0}.`);
+        }
         // ===== ПРОВЕРКА УРОВНЯ =====
         if (user.level < baseCost.level) {
             return ctx.reply(`❌ Нужен ${baseCost.level} уровень! У тебя ${user.level}.`);
