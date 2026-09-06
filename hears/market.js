@@ -1,5 +1,6 @@
 const { getUser, saveUser } = require('../utils/storage');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
+const { MARKET_COMMISSION } = require('../config/constants');
 
 const PRICES = {
     sell: { food: 1, coins: 3 },
@@ -8,10 +9,12 @@ const PRICES = {
 
 async function showMarketMenu(ctx) {
     const user = getUser(ctx.from.id);
+    if (!user) return ctx.reply('❌ Сначала /start');
     if ((user.techTree?.economy || 0) < 1) {
         return ctx.reply('❌ Торговля доступна только после изучения 1 уровня экономики.');
     }
-    await ctx.reply(
+
+    const text =
         `🏪 РЫНОК\n\n` +
         `💰 Золото: ${user.gold}\n` +
         `🍖 Еда: ${user.food || 0}\n` +
@@ -19,19 +22,24 @@ async function showMarketMenu(ctx) {
         `📊 Курсы:\n` +
         `🍖 Еда: 1💰 (покупка: 2💰)\n` +
         `🪙 Монеты: 3💰 (покупка: 6💰)\n\n` +
-        `👇 Выбери действие:`,
-        {
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '🍖 Продать еду', callback_data: 'market_sell_food' }],
-                    [{ text: '🪙 Продать монеты', callback_data: 'market_sell_coins' }],
-                    [{ text: '🍖 Купить еду', callback_data: 'market_buy_food' }],
-                    [{ text: '🪙 Купить монеты', callback_data: 'market_buy_coins' }],
-                    [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-                ]
-            }
-        }
-    );
+        `👇 Выбери действие:`;
+
+    const reply_markup = {
+        inline_keyboard: [
+            [{ text: '🍖 Продать еду', callback_data: 'market_sell_food' }],
+            [{ text: '🪙 Продать монеты', callback_data: 'market_sell_coins' }],
+            [{ text: '🍖 Купить еду', callback_data: 'market_buy_food' }],
+            [{ text: '🪙 Купить монеты', callback_data: 'market_buy_coins' }],
+            [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+        ]
+    };
+
+    if (ctx.callbackQuery) {
+        await ctx.editMessageText(text, { reply_markup });
+        await ctx.answerCbQuery();
+    } else {
+        await ctx.reply(text, { reply_markup });
+    }
 }
 
 async function sellResource(ctx, resource) {
@@ -46,12 +54,18 @@ async function sellResource(ctx, resource) {
         return ctx.reply(`❌ У тебя только ${user[resource] || 0} ${resource}.`);
     }
 
+    // ===== КОМИССИЯ =====
+    const ecoLevel = user.techTree?.economy || 0;
+    const commissionRate = MARKET_COMMISSION[ecoLevel] || 0.15;
+    const basePrice = amount * price;
+    const commission = Math.floor(basePrice * commissionRate);
+    const earned = basePrice - commission;
+
     user[resource] -= amount;
-    user.gold += amount * price;
+    user.gold += earned;
     saveUser(ctx.from.id, user);
 
-    await ctx.answerCbQuery(`✅ Продано ${amount} ${resource} за ${amount * price}💰`);
-    await ctx.reply(`✅ Продано ${amount} ${resource} за ${amount * price} золота.`);
+    await ctx.answerCbQuery(`✅ Продано ${amount} ${resource} за ${earned}💰 (комиссия: ${commission})`);
     await showMarketMenu(ctx);
 }
 
@@ -80,7 +94,7 @@ async function buyResource(ctx, resource) {
     }
 
     await ctx.answerCbQuery(`✅ Куплено ${amount} ${resource} за ${cost}💰`);
-    await ctx.reply(`✅ Куплено ${amount} ${resource} за ${cost} золота.`);
+    // Обновляем меню (редактируем текущее)
     await showMarketMenu(ctx);
 }
 

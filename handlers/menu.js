@@ -29,7 +29,7 @@ function getQuestTracker(user) {
 
 async function showMainMenu(ctx) {
     const userId = ctx.from.id;
-    const user = await getUser(userId);
+    const user = getUser(userId); // убрал await, так как getUser синхронный
 
     let text = getHeader(user);
     text += `\n👇 Выбери действие:`;
@@ -88,21 +88,28 @@ async function showMainMenu(ctx) {
         { text: 'ℹ️ О боте', callback_data: 'about_show' }
     ]);
 
-    // ===== ✅ ДОБАВЛЯЕМ REPLY-КЛАВИАТУРУ =====
-    const replyKeyboard = {
-        keyboard: [
-            ['🏙️ Город', '⚔️ Босс'],
-            ['🏪 Рынок', '🪖 Казарма'],
-            ['👥 Пригласить друга', '🎁 Ежедневный бонус'],
-            ['🏆 Олимп', 'ℹ️ О боте']
-        ],
-        resize_keyboard: true
-    };
-    await ctx.reply(text, {
+    const extra = {
         reply_markup: {
             inline_keyboard: buttons
         }
-    });
+    };
+
+    // Если вызов через кнопку — редактируем, иначе — новое сообщение
+    if (ctx.callbackQuery) {
+        try {
+            await ctx.editMessageText(text, extra);
+            await ctx.answerCbQuery();
+        } catch (err) {
+            if (err.description && err.description.includes('message is not modified')) {
+                await ctx.answerCbQuery();
+            } else {
+                console.error('❌ Ошибка редактирования главного меню:', err);
+                await ctx.reply(text, extra);
+            }
+        }
+    } else {
+        await ctx.reply(text, extra);
+    }
 }
 
 module.exports = { showMainMenu, getHeader, getQuestTracker };

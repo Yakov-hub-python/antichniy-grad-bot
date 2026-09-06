@@ -1,5 +1,5 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
-const { BUILDING_COSTS, BUILDING_NAMES, MAX_BUILDINGS } = require('../config/constants');
+const { BUILDING_COSTS, BUILDING_NAMES, MAX_BUILDINGS, TECH_TREE } = require('../config/constants');
 const { getProgressivePrice, getDiminishedIncome } = require('../utils/helpers');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
@@ -17,12 +17,13 @@ module.exports = {
         if (!baseCost) {
             return ctx.reply('❌ Неизвестное здание.');
         }
-        // ===== ПРОВЕРКА ВЕТКИ ЭКОНОМИКИ =====
-        const requiredEconomy = baseCost.economyLevel || 0;
-        if (requiredEconomy > 0 && (user.techTree?.economy || 0) < requiredEconomy) {
-            return ctx.reply(`❌ Это здание открывается на ${requiredEconomy} уровне ветки экономики. Твой уровень: ${user.techTree?.economy || 0}.`);
+
+        // ===== ПРОВЕРКА УРОВНЯ ГОРОДА =====
+        // Защита от null/undefined
+        if (user.level === null || user.level === undefined) {
+            const total = Object.values(user.buildings).reduce((a, b) => a + b, 0);
+            user.level = total + 1;
         }
-        // ===== ПРОВЕРКА УРОВНЯ =====
         if (user.level < baseCost.level) {
             return ctx.reply(`❌ Нужен ${baseCost.level} уровень! У тебя ${user.level}.`);
         }
@@ -32,14 +33,16 @@ module.exports = {
         if (MAX_BUILDINGS[type] !== undefined && currentCount >= MAX_BUILDINGS[type]) {
             return ctx.reply(`❌ Нельзя построить больше ${MAX_BUILDINGS[type]} зданий этого типа.`);
         }
-
+        
         // ===== ПРОГРЕССИВНАЯ ЦЕНА =====
+        const discount = TECH_TREE.economy.levels[user.techTree?.economy || 0]?.bonus?.buildDiscount || 0;
         const actualCost = {
-            gold: getProgressivePrice(baseCost.gold, currentCount),
-            coins: getProgressivePrice(baseCost.coins, currentCount),
-            iron: getProgressivePrice(baseCost.iron || 0, currentCount),
+            gold: Math.floor(getProgressivePrice(baseCost.gold, currentCount) * (1 - discount)),
+            coins: Math.floor(getProgressivePrice(baseCost.coins, currentCount) * (1 - discount)),
+            iron: Math.floor(getProgressivePrice(baseCost.iron || 0, currentCount) * (1 - discount)),
             level: baseCost.level
         };
+        
 
         // ===== ПРОВЕРКА РЕСУРСОВ =====
         if (user.gold < actualCost.gold) {
@@ -56,27 +59,29 @@ module.exports = {
         user.gold -= actualCost.gold;
         user.coins -= actualCost.coins;
         user.iron -= actualCost.iron;
+
+        // ===== УВЕЛИЧИВАЕМ СЧЁТЧИК ЗДАНИЯ С ЗАЩИТОЙ ОТ NULL =====
+        if (user.buildings[type] === undefined || user.buildings[type] === null) {
+            user.buildings[type] = 0;
+        }
         user.buildings[type] += 1;
 
-        // ===== ЭФФЕКТЫ ЗДАНИЙ =====
+        // ===== ПЕРЕСЧИТЫВАЕМ УРОВЕНЬ =====
+        const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
+        user.level = totalBuildings + 1;
+
+        // ===== ЭФФЕКТЫ ЗДАНИЙ (кроме акрополя) =====
         if (type === 'hut') user.citizens += 3;
         if (type === 'house') user.citizens += 5;
         if (type === 'tavern') user.citizens += 2;
         if (type === 'barracks') user.soldiers += 2;
-        if (type === 'acropolis') {
-            user.acropolisBuilt = true;
-            user.acropolisBuiltDate = Date.now();
-        }
+        // Акрополь удалён — эффект больше не применяется
         if (type === 'walls') {
             user.walls = (user.walls || 0) + 1;
         }
         if (type === 'forge') {
             user.soldierDamage = (user.soldierDamage || 0) + 1;
         }
-
-        // ===== ОБНОВЛЯЕМ УРОВЕНЬ =====
-        const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
-        user.level = totalBuildings + 1;
 
         // ===== ОБУЧЕНИЕ =====
         if (type === 'hut' || type === 'farm' || type === 'mine') {
@@ -114,7 +119,17 @@ module.exports = {
         // ===== СОХРАНЯЕМ =====
         saveUser(userId, user);
 
-        await ctx.reply(`✅ ${BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`);
-        await city.show(ctx);
+        await ctx.editMessageText(`
+            ✅ ${BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`, 
+            { 
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🏗️ Строить', callback_data: 'build_menu' }],
+                        [{ text: 'Город ', callback_data: 'city_show' }],
+                        [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+                    ]
+                } 
+            }
+        );
     }
 };

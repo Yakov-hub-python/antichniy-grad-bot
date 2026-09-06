@@ -59,7 +59,8 @@ function getProgressivePrice(basePrice, count) {
 function applyWealthTax(user) {
     if (!user || user.coins <= WEALTH_TAX.threshold) return 0;
     const excess = user.coins - WEALTH_TAX.threshold;
-    const tax = Math.floor(excess * WEALTH_TAX.rate);
+    const rate = WEALTH_TAX.rate * (1 - (user.taxReduction || 0));
+    const tax = Math.floor(excess * rate);
     user.coins -= tax;
     return tax;
 }
@@ -72,6 +73,7 @@ function calculateIncome(user) {
     const buildings = user.buildings || {};
     const citizens = user.citizens || 5;
     const soldiers = user.soldiers || 0;
+    const ecoLevel = user.techTree?.economy || 0;
 
     // ===== НУЖНО РАБОЧИХ =====
     const WORKERS_NEEDED = {
@@ -92,21 +94,30 @@ function calculateIncome(user) {
     const workers = Math.min(citizens, neededWorkers);
     const efficiency = neededWorkers > 0 ? workers / neededWorkers : 1;
 
-    // ===== БАЗОВЫЙ ДОХОД С УБЫВАЮЩЕЙ ДОХОДНОСТЬЮ =====
-    let gold = getDiminishedIncome(6, buildings.mine || 0) +
-        getDiminishedIncome(200, buildings.quarry || 0) +
-        (buildings.market || 0) * 10 +
-        (buildings.garden || 0) * 5;
+    // ===== БАЗОВЫЙ ДОХОД =====
+    let gold = 0;
+    let food = 0;
+    let coins = 0;
+    let iron = 0;
 
-    let food = getDiminishedIncome(5, buildings.farm || 0) +
-        getDiminishedIncome(250, buildings.field || 0) +
-        (buildings.tavern || 0) * 1;
+    // Золото
+    gold += getDiminishedIncome(6, buildings.mine || 0);
+    gold += getDiminishedIncome(200, buildings.quarry || 0);
+    gold += (buildings.market || 0) * 10;
+    gold += (buildings.garden || 0) * 5;
 
-    let coins = getDiminishedIncome(6, buildings.mint || 0) +
-        getDiminishedIncome(500, buildings.mint_factory || 0);
+    // Еда
+    food += getDiminishedIncome(5, buildings.farm || 0);
+    food += getDiminishedIncome(250, buildings.field || 0);
+    food += (buildings.tavern || 0) * 1;
 
-    let iron = getDiminishedIncome(10, buildings.iron_mine || 0) +
-        getDiminishedIncome(50, buildings.smelter || 0);
+    // Монеты
+    coins += getDiminishedIncome(6, buildings.mint || 0);
+    coins += getDiminishedIncome(500, buildings.mint_factory || 0);
+
+    // Железо
+    iron += getDiminishedIncome(10, buildings.iron_mine || 0);
+    iron += getDiminishedIncome(50, buildings.smelter || 0);
 
     // ===== БАНК (бонус к монетам) =====
     if (buildings.bank) {
@@ -119,13 +130,13 @@ function calculateIncome(user) {
         user.soldierDamage = (user.soldierDamage || 0) + buildings.forge;
     }
 
-    // ===== ПРИМЕНЯЕМ ЭФФЕКТИВНОСТЬ =====
+    // ===== ЭФФЕКТИВНОСТЬ =====
     gold = Math.floor(gold * efficiency);
     food = Math.floor(food * efficiency);
     coins = Math.floor(coins * efficiency);
     iron = Math.floor(iron * efficiency);
 
-    // ===== VIP БОНУС (+20%) =====
+    // ===== VIP =====
     if (isVIP(user)) {
         gold = Math.floor(gold * 1.2);
         food = Math.floor(food * 1.2);
@@ -133,12 +144,34 @@ function calculateIncome(user) {
         iron = Math.floor(iron * 1.2);
     }
 
-    // ===== АКРОПОЛЬ (+10%) =====
+    // ===== АКРОПОЛЬ =====
     if (user.acropolisBuilt) {
         gold = Math.floor(gold * 1.1);
         food = Math.floor(food * 1.1);
         coins = Math.floor(coins * 1.1);
         iron = Math.floor(iron * 1.1);
+    }
+
+    // ===== ВЕТКА ЭКОНОМИКИ =====
+    if (ecoLevel > 0) {
+        const ecoBonus = TECH_TREE.economy.levels[ecoLevel]?.bonus?.incomeMultiplier || 1;
+        const coinBonus = TECH_TREE.economy.levels[ecoLevel]?.bonus?.coinMultiplier || 1;
+        gold = Math.floor(gold * ecoBonus);
+        food = Math.floor(food * ecoBonus);
+        coins = Math.floor(coins * coinBonus);
+        iron = Math.floor(iron * ecoBonus);
+    }
+
+    // ===== ЭКОНОМИЧЕСКОЕ ЧУДО =====
+    const now = Date.now();
+    if (user.miracleActive && user.miracleExpiresAt && now < user.miracleExpiresAt) {
+        gold = Math.floor(gold * 1.3);
+        food = Math.floor(food * 1.3);
+        coins = Math.floor(coins * 1.3);
+        iron = Math.floor(iron * 1.3);
+    } else if (user.miracleActive && user.miracleExpiresAt && now >= user.miracleExpiresAt) {
+        user.miracleActive = false;
+        user.miracleExpiresAt = 0;
     }
 
     // ===== ЕДА ДЛЯ ЖИТЕЛЕЙ И СОЛДАТ =====
@@ -164,29 +197,16 @@ function calculateIncome(user) {
         finalFood = Math.floor(foodAfterEat);
     }
 
-    // ===== НАЛОГ НА БОГАТСТВО =====
+    // ===== НАЛОГОВАЯ ЛЬГОТА =====
+    const taxReduction = TECH_TREE.economy.levels[ecoLevel]?.bonus?.taxReduction || 0;
+    user.taxReduction = taxReduction;
+
+    // ===== НАЛОГ =====
     const tax = applyWealthTax(user);
     if (tax > 0) {
         console.log(`💰 Налог: ${tax} монет у пользователя ${user.id}`);
     }
-    const ecoLevel = user.techTree?.economy || 0;
-    if (ecoLevel > 0) {
-        const ecoBonus = TECH_TREE.economy.levels[ecoLevel]?.bonus?.incomeMultiplier || 1;
-        gold = Math.floor(gold * ecoBonus);
-        coins = Math.floor(coins * (TECH_TREE.economy.levels[ecoLevel]?.bonus?.coinMultiplier || 1));
-    }
-    // Проверяем, активна ли способность
-    const now = Date.now();
-    if (user.miracleActive && user.miracleExpiresAt && now < user.miracleExpiresAt) {
-        gold = Math.floor(gold * 1.3);
-        food = Math.floor(food * 1.3);
-        coins = Math.floor(coins * 1.3);
-        iron = Math.floor(iron * 1.3);
-    } else if (user.miracleActive && user.miracleExpiresAt && now >= user.miracleExpiresAt) {
-        // Автоматически отключаем после истечения
-        user.miracleActive = false;
-        user.miracleExpiresAt = 0;
-    }
+
     return {
         gold: Math.floor(gold),
         food: Math.floor(finalFood),

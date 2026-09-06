@@ -1,88 +1,85 @@
 const { getUser, saveUser } = require('../utils/storage');
-const { calculateIncome, getIncomeInterval, isVIP } = require('../utils/helpers');
+const { calculateIncome, isVIP, getIncomeInterval } = require('../utils/helpers');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
-const { advanceTraining } = require('../utils/training');
 
 module.exports = {
     collect: async (ctx) => {
         const userId = ctx.from.id;
         const user = getUser(userId);
+        if (!user) return ctx.reply('❌ Сначала /start');
+
         const now = Date.now();
         const interval = getIncomeInterval(user);
-        const elapsed = now - user.lastIncome;
+        const lastIncome = user.lastIncome || 0;
 
-        if (elapsed < interval) {
-            const leftMs = interval - elapsed;
-            const minutes = Math.floor(leftMs / 60000);
-            const seconds = Math.floor((leftMs % 60000) / 1000);
-            let timeText = minutes > 0 ? `${minutes}м ${seconds}с` : `${seconds}с`;
-            return ctx.reply(`⏳ Доход через ${timeText}`);
+        if (now - lastIncome < interval) {
+            const left = Math.ceil((interval - (now - lastIncome)) / 1000);
+            const minutes = Math.floor(left / 60);
+            const seconds = left % 60;
+            const timeText = minutes > 0 ? `${minutes}м ${seconds}с` : `${seconds}с`;
+            const replyText = `⏳ Доход можно собрать через ${timeText}`;
+            if (ctx.callbackQuery) {
+                await ctx.answerCbQuery(replyText);
+            } else {
+                await ctx.reply(replyText);
+            }
+            return;
         }
 
         const income = calculateIncome(user);
-
-        if (income.gold === 0 && income.food === 0 && income.coins === 0) {
-            return ctx.reply('🏗️ Нет зданий — нет дохода. Построй шахты, фермы или монетный двор!');
-        }
-
-        // Обновляем ресурсы
+        // Применяем доход
         user.gold += income.gold;
-        user.food = income.food;
-        user.coins = (user.coins || 0) + income.coins;
-        user.ore = (user.ore || 0) + (income.ore || 0);
-        user.ingot = (user.ingot || 0) + (income.ingot || 0);
+        user.food += income.food;
+        user.coins += income.coins;
+        // Железо и металл, если есть
+        if (income.iron) user.iron = (user.iron || 0) + income.iron;
+        if (income.metal) user.metal = (user.metal || 0) + income.metal;
         user.lastIncome = now;
 
-        saveUser(userId, user);
+        // VIP статус
+        const vip = isVIP(user);
+        let vipText = vip ? '\n👑 VIP ×1.33!' : '';
 
-        let message = `💰 СОБРАН ДОХОД!\n\n`;
-        message += `💰 +${income.gold} золота\n`;
-        message += `🍖 +${income.food} еды (съедено: ${income.foodEaten})\n`;
-        message += `🪙 +${income.coins} монет\n`;
-        if (income.ore > 0) message += `⛏️ +${income.ore} руды\n`;
-        if (income.ingot > 0) message += `🔥 +${income.ingot} слитков\n`;
-
-        if (income.deserters > 0) {
-            message += `\n⚠️ ${income.deserters} солдат дезертировало из-за нехватки еды!\n`;
-            message += `🪖 Осталось солдат: ${user.soldiers}`;
-        }
-
-        if (isVIP(user)) {
-            message += `\n👑 VIP ×1.33!`;
-        }
-
-        await ctx.reply(message);
-
-        // ===== ОБУЧЕНИЕ =====
-        const trainingResult = advanceTraining(user, 'collect_income');
-        if (trainingResult) {
-            if (trainingResult.completed) {
-                await ctx.reply(`🎉 ОБУЧЕНИЕ ЗАВЕРШЕНО!\n🏆 Награда: ${trainingResult.step.reward}💰\n\nТы готов к игре! 🏛️`);
-            } else {
-                const nextStep = trainingResult.nextStep;
-                await ctx.reply(
-                    `✅ Шаг ${trainingResult.step.id} выполнен!\n💰 +${trainingResult.step.reward} золота\n\n` +
-                    `📚 СЛЕДУЮЩИЙ ШАГ:\n${nextStep.title}\n${nextStep.description}\n\n` +
-                    `🏆 Награда: ${nextStep.reward}💰`
-                );
-            }
-            saveUser(userId, user);
-        }
-
-        // ===== КВЕСТЫ =====
-        const questResult = updateQuestProgress(user, 'income');
+        // Квесты
+        const questResult = updateQuestProgress(user, 'income', 1);
         if (questResult?.completed) {
             await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
             claimQuestReward(user);
         }
 
-        // ===== ДОСТИЖЕНИЯ =====
+        // Достижения
         const newAchievements = checkAchievements(user);
         for (const ach of newAchievements) {
             await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
             claimAchievementReward(user, ach);
             await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
+        }
+
+        saveUser(userId, user);
+
+        const text =
+            `💰 СОБРАН ДОХОД!\n` +
+            `💰 +${income.gold} золота\n` +
+            `🍖 +${income.food} еды (съедено: ${income.foodEaten || 0})\n` +
+            `🪙 +${income.coins} монет` +
+            (income.iron ? `\n⛏️ +${income.iron} железа` : '') +
+            (income.metal ? `\n🔩 +${income.metal} металла` : '') +
+            (income.deserters ? `\n⚔️ Дезертиров: ${income.deserters}` : '') +
+            (income.tax ? `\n💰 Налог: ${income.tax} монет` : '') +
+            vipText;
+
+        const reply_markup = {
+            inline_keyboard: [
+                [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+            ]
+        };
+
+        if (ctx.callbackQuery) {
+            await ctx.editMessageText(text, { reply_markup });
+            await ctx.answerCbQuery();
+        } else {
+            await ctx.reply(text, { reply_markup });
         }
     }
 };

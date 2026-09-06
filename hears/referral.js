@@ -17,24 +17,27 @@ module.exports = {
             // Не отправляем сообщение здесь, чтобы не спамить
             // Но отмечаем, что квест выполнен
         }
-
-        await ctx.reply(
-            `👥 ПРИГЛАСИ ДРУГА!\n\n` +
+        const text = `👥 ПРИГЛАСИ ДРУГА!\n\n` +
             `📎 Твоя ссылка:\n${refLink}\n\n` +
             `🔥 За каждого друга ты получаешь 200💰 и VIP 3 дня!\n` +
             `👑 Когда друг достигнет 5 уровня:\n` +
             `   • ${vipDays} дней VIP тебе и другу\n` +
             `   • ${refCount >= 3 ? '✅ 3+ друзей → 7 дней VIP!' : `Осталось ${3 - refCount} друга до 7 дней VIP`}\n\n` +
-            `👥 Друзей: ${refCount}`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '📋 Скопировать ссылку', callback_data: 'copy_ref' }],
-                        [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-                    ]
-                }
+            `👥 Друзей: ${refCount}`
+
+        const reply_markup = {
+                inline_keyboard: [
+                    [{ text: '📋 Скопировать ссылку', copy_text: { text: refLink } }],
+                    [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+                ]
             }
-        );
+            
+        if (ctx.callbackQuery) {
+            await ctx.editMessageText(text, { reply_markup });
+            await ctx.answerCbQuery();
+        } else {
+            await ctx.reply(text, { reply_markup });
+        }
 
         // ===== ЕСЛИ КВЕСТ ВЫПОЛНЕН — СООБЩАЕМ =====
         if (questResult?.completed) {

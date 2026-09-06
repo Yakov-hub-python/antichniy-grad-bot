@@ -1,7 +1,6 @@
 module.exports = {
     show: async (ctx) => {
-        await ctx.reply(
-            `🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n` +
+        const text = `🏛️ АНТИЧНЫЙ ГРАДОНАЧАЛЬНИК\n\n` +
             `📌 Версия: 1.6.1\n` +
             `👨‍💻 Разработчик: @DEDAYSON\n\n` +
             `📖 О ПРОЕКТЕ\n` +
@@ -18,14 +17,19 @@ module.exports = {
             `• всем игрокам — за вашу активность и терпение!\n\n` +
             `📢 КАНАЛ И ЧАТ\n` +
             `📢 Канал: @antichniy_grad\n` +
-            `💬 Чат: @antichniy_grad_chat`,
-            {
-                reply_markup: {
+            `💬 Чат: @antichniy_grad_chat`
+
+
+        const reply_markup ={
                     inline_keyboard: [
                         [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
                     ]
                 }
-            }
-        );
+        if (ctx.callbackQuery) {
+            await ctx.editMessageText(text, { reply_markup });
+            await ctx.answerCbQuery();
+        } else {
+            await ctx.reply(text, { reply_markup });
+        }
     }
 };

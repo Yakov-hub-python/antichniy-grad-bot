@@ -22,8 +22,6 @@ const BUILDING_COSTS = {
     
     // ===== ТОРГОВЫЕ =====
     bank:{ gold: 0, coins: 500, iron: 0, level: 10, economyLevel: 2 },
-    // ===== ОСОБЫЕ =====
-    acropolis: { gold: 0, coins: 500, iron: 0, level: 5 },
 };
 
 // ============================================================
@@ -50,9 +48,6 @@ const BUILDING_NAMES = {
     
     // Торговые
     bank: '🏛️ Банк',
-    
-    // Особые
-    acropolis: '🏛️ Акрополь',
 };
 
 // ============================================================
@@ -74,8 +69,6 @@ const BUILDING_DESCRIPTIONS = {
     mint_factory: 'Промышленное производство. Даёт +500 монет за сбор.',
 
     bank: 'Финансовый центр. +5% к доходу с монет за каждый банк.',
-    
-    acropolis: 'Священный холм. +10% ко всем доходам навсегда.',
 };
 
 // ============================================================
@@ -88,7 +81,6 @@ const BUILDING_CATEGORIES = {
     '⛏️ Добывающие': ['mine', 'quarry'],
     '🏪 Торговые': ['bank'],
     '🏭 Производственные': ['mint', 'mint_factory',],
-    '🏛️ Особые': ['acropolis'],
 };
 
 // ============================================================
@@ -104,7 +96,6 @@ const MAX_BUILDINGS = {
     mine: 150,
     quarry: 80,
     bank: 10,
-    acropolis: 1,
 };
 
 // ============================================================
@@ -126,8 +117,6 @@ const BUILDING_INCOME = {
     mint_factory: { coins: 500 },
     
     bank: { coinsBonus: 0.05 },
-    
-    acropolis: { incomeBonus: 0.1 },
 };
 
 // ============================================================
@@ -151,17 +140,113 @@ const INCOME_INTERVALS = {
 const TECH_TREE = {
     economy: {
         name: '🏛️ Экономика',
+        description: 'Развивай торговлю, строй банки и увеличивай доходы города.',
         levels: {
-            1: { cost: { gold: 1000, coins: 0 }, requirements: { level: 5 }, cooldown: 3600000, unlocks: ['market'], bonus: { incomeMultiplier: 1.00 } },
-            2: { cost: { gold: 2500, coins: 50 }, requirements: { level: 10 }, cooldown: 720000, unlocks: ['bank'], bonus: { incomeMultiplier: 1.05 } },
-            3: { cost: { gold: 5000, coins: 100 }, requirements: { level: 15 }, cooldown: 1000, unlocks: ['port'], bonus: { incomeMultiplier: 1.10 } },
-            4: { cost: { gold: 10000, coins: 200 }, requirements: { level: 20 }, cooldown: 21600000, unlocks: ['tax_break'], bonus: { taxReduction: 0.10 } },
-            5: { cost: { gold: 20000, coins: 500 }, requirements: { level: 25 }, cooldown: 28800000, unlocks: ['trade_route'], bonus: { sellBonus: 1.15 } },
-            6: { cost: { gold: 40000, coins: 1000 }, requirements: { level: 30 }, cooldown: 43200000, unlocks: ['factory'], bonus: { incomeMultiplier: 1.20 } },
-            7: { cost: { gold: 80000, coins: 2000 }, requirements: { level: 35 }, cooldown: 57600000, unlocks: ['guild'], bonus: { incomeMultiplier: 1.25 } },
-            8: { cost: { gold: 160000, coins: 4000 }, requirements: { level: 40 }, cooldown: 72000000, unlocks: ['mint_house'], bonus: { coinMultiplier: 1.20 } },
-            9: { cost: { gold: 320000, coins: 8000 }, requirements: { level: 45 }, cooldown: 86400000, unlocks: ['economic_miracle'], bonus: { incomeMultiplier: 1.30, activeAbility: 'economic_miracle' } },
-            10: { cost: { gold: 640000, coins: 16000 }, requirements: { level: 50 }, cooldown: 172800000, unlocks: ['financial_empire'], bonus: { incomeMultiplier: 1.50 } }
+            1: {
+                cost: { gold: 500, coins: 0 },
+                requirements: { level: 5 },
+                cooldown: 1 * 60 * 60 * 1000,
+                unlocks: ['Рынок'],
+                bonus: { incomeMultiplier: 1.00, description: 'Открывает рынок' }
+            },
+            2: {
+                cost: { gold: 1000, coins: 20 },
+                requirements: { level: 10 },
+                cooldown: 2 * 60 * 60 * 1000,
+                unlocks: ['Банк'],
+                bonus: { incomeMultiplier: 1.05, description: 'Множитель дохода +5%' }
+            },
+            3: {
+                cost: { gold: 2000, coins: 50 },
+                requirements: { level: 15 },
+                cooldown: 3 * 60 * 60 * 1000,
+                unlocks: ['Порт'],
+                bonus: { incomeMultiplier: 1.10, description: 'Множитель дохода +10%' }
+            },
+            4: {
+                cost: { gold: 3500, coins: 100 },
+                requirements: { level: 20 },
+                cooldown: 4 * 60 * 60 * 1000,
+                unlocks: ['Налоговая льгота'],
+                bonus: { taxReduction: 0.10, description: 'Снижение налога на 10%' }
+            },
+            5: {
+                cost: { gold: 5000, coins: 200 },
+                requirements: { level: 25 },
+                cooldown: 6 * 60 * 60 * 1000,
+                unlocks: ['Торговый путь'],
+                bonus: { sellBonus: 1.10, description: 'Продажи +10%' }
+            },
+            6: {
+                cost: { gold: 8000, coins: 400 },
+                requirements: { level: 30 },
+                cooldown: 8 * 60 * 60 * 1000,
+                unlocks: ['Фабрика'],
+                bonus: { incomeMultiplier: 1.15, description: 'Множитель дохода +15%' }
+            },
+            7: {
+                cost: { gold: 12000, coins: 700 },
+                requirements: { level: 35 },
+                cooldown: 10 * 60 * 60 * 1000,
+                unlocks: ['Снижение комиссии рынка'],
+                bonus: { incomeMultiplier: 1.20, description: 'Множитель дохода +20%' }
+            },
+            8: {
+                cost: { gold: 20000, coins: 1200 },
+                requirements: { level: 40 },
+                cooldown: 12 * 60 * 60 * 1000,
+                unlocks: ['Монетный двор'],
+                bonus: { coinMultiplier: 1.15, description: 'Монеты +15%' }
+            },
+            9: {
+                cost: { gold: 35000, coins: 2000 },
+                requirements: { level: 45 },
+                cooldown: 16 * 60 * 60 * 1000,
+                unlocks: ['Экономическое чудо'],
+                bonus: { incomeMultiplier: 1.20, activeAbility: 'economic_miracle', description: 'Множитель дохода +20% + активная способность' }
+            },
+            10: {
+                cost: { gold: 60000, coins: 3500 },
+                requirements: { level: 50 },
+                cooldown: 20 * 60 * 60 * 1000,
+                unlocks: ['Финансовая империя'],
+                bonus: { incomeMultiplier: 1.30, description: 'Множитель дохода +30%' }
+            },
+            11: {
+                cost: { gold: 100000, coins: 6000 },
+                requirements: { level: 55 },
+                cooldown: 24 * 60 * 60 * 1000,
+                unlocks: ['Снижение комиссии рынка до 5%'],
+                bonus: { incomeMultiplier: 1.35, description: 'Множитель дохода +35%' }
+            },
+            12: {
+                cost: { gold: 160000, coins: 10000 },
+                requirements: { level: 60 },
+                cooldown: 28 * 60 * 60 * 1000,
+                unlocks: ['Торговая гильдия'],
+                bonus: { incomeMultiplier: 1.40, description: 'Множитель дохода +40%' }
+            },
+            13: {
+                cost: { gold: 250000, coins: 16000 },
+                requirements: { level: 65 },
+                cooldown: 32 * 60 * 60 * 1000,
+                unlocks: ['Снижение стоимости строительства'],
+                bonus: { buildDiscount: 0.10, description: 'Строительство -10%' }
+            },
+            14: {
+                cost: { gold: 400000, coins: 25000 },
+                requirements: { level: 70 },
+                cooldown: 36 * 60 * 60 * 1000,
+                unlocks: ['+2 слота в порту'],
+                bonus: { incomeMultiplier: 1.45, description: 'Множитель дохода +45%' }
+            },
+            15: {
+                cost: { gold: 600000, coins: 40000 },
+                requirements: { level: 75 },
+                cooldown: 40 * 60 * 60 * 1000,
+                unlocks: ['Мировой рынок'],
+                bonus: { incomeMultiplier: 1.50, description: 'Множитель дохода +50%' }
+            }
         }
     }
 };
@@ -182,16 +267,35 @@ const WEALTH_TAX = {
 const MAIN_MENU = {
     reply_markup: {
         keyboard: [
-            ['ℹ️ О боте'],
-            ['🏙️ Город', '👥 Пригласить друга'],
+            ['👥 Пригласить друга'],
+            ['🏙️ Город', '⚔️ Босс'],
             ['🎁 Ежедневный бонус'],
-            ['🛒 Магазин', '⚔️ Босс'],
-            ['🏆 Олимп', '🪖 Казарма']
+            ['🏆 Олимп', '🪖 Казарма'],
+            ['ℹ️ О боте']
         ],
         resize_keyboard: true
     }
 };
 
+// ===== КОМИССИЯ РЫНКА (ЗАВИСИТ ОТ УРОВНЯ ЭКОНОМИКИ) =====
+const MARKET_COMMISSION = {
+    0: 0.15,   // 0 уровень — 15%
+    1: 0.15,
+    2: 0.15,
+    3: 0.10,   // 3 уровень — 10%
+    4: 0.10,
+    5: 0.10,
+    6: 0.10,
+    7: 0.07,   // 7 уровень — 7%
+    8: 0.07,
+    9: 0.07,
+    10: 0.07,
+    11: 0.05,  // 11 уровень — 5%
+    12: 0.05,
+    13: 0.05,
+    14: 0.05,
+    15: 0.05,
+};
 // ============================================================
 // 1️⃣1️⃣ ЭКСПОРТ
 // ============================================================
@@ -207,5 +311,6 @@ module.exports = {
     INCOME_INTERVALS,
     WEALTH_TAX,
     MAIN_MENU,
-    TECH_TREE
+    TECH_TREE,
+    MARKET_COMMISSION
 };

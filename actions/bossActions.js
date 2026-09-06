@@ -63,10 +63,23 @@ module.exports = {
         } else {
             user.personalBoss = personal;
             saveUser(userId, user);
-
-            await ctx.reply(
-                `⚔️ Урон: ${damage}. Осталось HP: ${personal.hp}/${getPersonalBossHP(user)}`
-            );
+            
+            // Если урон > 0 — обновляем сообщение
+            if (damage > 0) {
+                const keyboard = {
+                    inline_keyboard: [
+                        [{ text: '⚔️ Атаковать снова', callback_data: 'boss_personal' }]
+                    ]
+                };
+                await ctx.editMessageText(
+                    `⚔️ Ты нанёс ${damage} урона! Осталось HP: ${personal.hp}`,
+                    { reply_markup: keyboard }
+                );
+            } else {
+                // Если урон 0 — показываем уведомление и не редактируем сообщение
+                await ctx.answerCbQuery('❌ У тебя нет солдат! Найми их в казарме.');
+                // Можно также оставить сообщение без изменений
+            }
         }
     },
 

@@ -1,6 +1,7 @@
 const { getUser } = require('../utils/storage');
 const { BUILDING_COSTS, BUILDING_NAMES, BUILDING_DESCRIPTIONS, BUILDING_CATEGORIES } = require('../config/constants');
 const { getProgressivePrice } = require('../utils/helpers');
+const { inlineKeyboard } = require('telegraf/markup');
 
 module.exports = {
     showMenu: async (ctx) => {
@@ -67,11 +68,21 @@ module.exports = {
         // Кнопка назад
         buttons.push([{ text: '🔙 Назад', callback_data: 'back_to_city' }]);
 
-        await ctx.reply(menu, {
-            reply_markup: {
-                inline_keyboard: buttons,
-                resize_keyboard: true
-            }
-        });
+        if (ctx.callbackQuery) {
+            await ctx.editMessageText(menu, { 
+                reply_markup: {
+                    inline_keyboard: buttons,
+                    resize_keyboard: true
+                }
+            });
+            await ctx.answerCbQuery();
+        } else {
+            await ctx.reply(menu, { 
+                reply_markup: {
+                    inline_keyboard: buttons,
+                    resize_keyboard: true
+                } 
+            });
+        }
     }
 };

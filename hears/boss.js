@@ -23,20 +23,21 @@ module.exports = {
         const globalStatus = global.active
             ? `🔥 Активен! HP: ${global.hp}/${global.maxHp}`
             : `💤 Повержен. Следующий в 00:00, 6:00, 12:00 или 18:00`;
-
-        await ctx.reply(
-            `⚔️ БОССЫ\n\n` +
-            `👤 ЛИЧНЫЙ БОСС:\nHP: ${personal.hp}/${personal.maxHp}\n${personalStatus}\n🏆 Убийств: ${personal.kills || 0}\n\n` +
-            `🌍 ГЛОБАЛЬНЫЙ БОСС:ОТМЕНЕН\n`, //${globalStatus}
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: '⚔️ Атаковать личного', callback_data: 'boss_personal' }],
-                        [{ text: '⚔️ Атаковать глобального', callback_data: 'boss_global' }],
-                        [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-                    ]
-                }
+        const text = `⚔️ БОССЫ\n\n` +
+            `👤 ЛИЧНЫЙ БОСС:\nHP: ${personal.hp}/${personal.maxHp}\n${personalStatus}\n`+
+            `🏆 Убийств: ${personal.kills || 0}\n\n`
+        
+            const reply_markup = {
+                inline_keyboard: [
+                    [{ text: '⚔️ Атаковать личного', callback_data: 'boss_personal' }],
+                    [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+                ]
             }
-        );
+        if (ctx.callbackQuery) {
+            await ctx.editMessageText(text, { reply_markup });
+            await ctx.answerCbQuery();
+        } else {
+            await ctx.reply(text, { reply_markup });
+        }
     }
 };

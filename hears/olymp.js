@@ -36,6 +36,17 @@ module.exports = {
             `📆 ПО СТРИКУ:\n${topStreak}\n\n` +
             `🏛️ ТОП КЛАНОВ:\n${topClans}`;
 
-        await ctx.reply(text);
+        const reply_markup = {
+            inline_keyboard: [
+                [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+            ]
+        };
+
+        if (ctx.callbackQuery) {
+            await ctx.editMessageText(text, { reply_markup });
+            await ctx.answerCbQuery();
+        } else {
+            await ctx.reply(text, { reply_markup });
+        }
     }
 };

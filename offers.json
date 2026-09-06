@@ -23,6 +23,18 @@
       "createdAt": 1788628451945,
       "expiresAt": 1788801251945,
       "status": "sold"
+    },
+    {
+      "id": "offer_1788699476611_hhyb",
+      "sellerId": 5685152704,
+      "resource": "food",
+      "amount": 1,
+      "pricePerUnit": 2,
+      "totalPrice": 2,
+      "currency": "gold",
+      "createdAt": 1788699476613,
+      "expiresAt": 1788872276613,
+      "status": "active"
     }
   ]
 }

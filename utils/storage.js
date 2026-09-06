@@ -97,6 +97,19 @@ function getUser(id) {
             user.soldiers = 0;
             needSave = true;
         }
+        if (user.buildings) {
+            for (const key in user.buildings) {
+                if (user.buildings[key] === null) {
+                    user.buildings[key] = 0;
+                }
+            }
+        }
+        // Пересчёт уровня
+        const total = Object.values(user.buildings).reduce((a, b) => a + b, 0);
+        const newLevel = total + 1;
+        if (user.level !== newLevel) {
+            user.level = newLevel;
+        }
         
         // Проверяем coins
         if (user.coins === undefined) {
