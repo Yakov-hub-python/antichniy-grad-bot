@@ -1,6 +1,5 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
-const { MAIN_MENU } = require('../config/constants');
-const { getSoldiers } = require('../utils/helpers');
+const { getSoldiers, MAX_SAFE } = require('../utils/helpers');
 const fs = require('fs');
 const path = require('path');
 const { showMainMenu } = require('../handlers/menu');
@@ -392,7 +391,8 @@ module.exports = (bot) => {
             `/list_users — список всех игроков\n` +
             `/delete_user @user — удалить игрока\n` +
             `/reset_user @user — сбросить игрока\n` +
-            `/recalc_level — восстановление уровня\n\n`+
+            `/recalc_level — восстановление уровня\n`+
+            `/fix_resources — исправить переполненные ресурсы\n\n` +
 
             `📢 РАССЫЛКА:\n` +
             `/say текст — сообщение всем игрокам\n\n` +
@@ -434,37 +434,301 @@ module.exports = (bot) => {
         writeDB(db);
         ctx.reply(`✅ Уровень пересчитан для ${count} игроков.`);
     });
+    // ===== /FIX_RESOURCES =====
+    bot.command('fix_resources', async (ctx) => {
+        if (!isAdmin(ctx.from.id)) {
+            return ctx.reply('⛔ Нет прав.');
+        }
+
+        const db = readDB();
+
+        const LIMIT = MAX_SAFE * (2 / 3);
+        const resources = ['gold', 'food', 'coins'];
+
+        let playersFixed = 0;
+        let resourcesFixed = 0;
+
+        for (const id in db.users) {
+            const user = db.users[id];
+            let changed = false;
+
+            for (const resource of resources) {
+                const value = Number(user[resource] || 0);
+
+                if (value > MAX_SAFE) {
+                    user[resource] = Math.floor(LIMIT);
+                    changed = true;
+                    resourcesFixed++;
+
+                    console.log(
+                        `🧹 [FIX_RESOURCES] ${id}: ` +
+                        `${resource} ${value} → ${user[resource]}`
+                    );
+                }
+            }
+
+            if (changed) {
+                playersFixed++;
+            }
+        }
+
+        writeDB(db);
+
+        await ctx.reply(
+            `🧹 РЕСУРСЫ ОЧИЩЕНЫ\n\n` +
+            `👥 Игроков исправлено: ${playersFixed}\n` +
+            `📦 Ресурсов исправлено: ${resourcesFixed}\n\n` +
+            `🔒 MAX_SAFE: ${MAX_SAFE}\n` +
+            `✂️ Новый лимит: ${Math.floor(LIMIT)}`
+        );
+    });
     // ===== /STATS — СТАТИСТИКА БОТА =====
     bot.command('stats', async (ctx) => {
         if (!isAdmin(ctx.from.id)) {
-            console.log(`⛔ [STATS] Доступ запрещен для ${ctx.from.id}`);
+            console.log(`⛔ [STATS] Доступ запрещён для ${ctx.from.id}`);
             return ctx.reply('⛔ Доступ запрещён.');
         }
-        
-        console.log(`📊 [STATS] Запрос статистики от ${ctx.from.id}`);
-        
+
+        console.log(`📊 [STATS] Расширенная статистика от ${ctx.from.id}`);
+
         const db = readDB();
-        const users = Object.values(db.users);
+        const users = Object.values(db.users || {});
+
+        if (users.length === 0) {
+            return ctx.reply('📭 В базе данных пока нет игроков.');
+        }
+
+        // ============================================
+        // 👥 ИГРОКИ
+        // ============================================
+
         const totalPlayers = users.length;
-        const totalGold = users.reduce((sum, u) => sum + (u.gold || 0), 0);
-        const vipCount = users.filter(u => u.vip?.active).length;
-        const totalCitizens = users.reduce((sum, u) => sum + (u.citizens || 0), 0);
-        const totalSoldiers = users.reduce((sum, u) => {
-            const soldiers = (u.buildings?.barracks || 0) * 2 + Math.floor((u.citizens || 0) / 10);
-            return sum + soldiers;
-        }, 0);
 
-        const avgGold = totalPlayers > 0 ? Math.round(totalGold / totalPlayers) : 0;
+        const vipCount = users.filter(
+            u => u.vip?.active && u.vip.expiresAt > Date.now()
+        ).length;
 
-        await ctx.reply(
-            `📊 СТАТИСТИКА БОТА\n\n` +
-            `👥 Всего игроков: ${totalPlayers}\n` +
-            `💰 Всего золота: ${totalGold}\n` +
-            `📈 Средний баланс: ${avgGold}\n` +
-            `👑 VIP-игроков: ${vipCount}\n` +
-            `👥 Всего жителей: ${totalCitizens}\n` +
-            `🪖 Всего солдат: ${totalSoldiers}`
+        const totalCitizens = users.reduce(
+            (sum, u) => sum + (Number(u.citizens) || 0),
+            0
         );
+
+        const totalSoldiers = users.reduce(
+            (sum, u) => sum + getSoldiers(u),
+            0
+        );
+
+        const totalBuildings = users.reduce(
+            (sum, u) => sum + Object.values(u.buildings || {}).reduce(
+                (a, b) => a + (Number(b) || 0),
+                0
+            ),
+            0
+        );
+
+        const totalBossKills = users.reduce(
+            (sum, u) => sum + (Number(u.bossKills) || 0),
+            0
+        );
+
+        // ============================================
+        // 📈 УРОВНИ
+        // ============================================
+
+        const totalLevels = users.reduce(
+            (sum, u) => sum + (Number(u.level) || 1),
+            0
+        );
+
+        const averageLevel = Math.round(totalLevels / totalPlayers);
+
+        const maxLevel = Math.max(
+            ...users.map(u => Number(u.level) || 1)
+        );
+
+        const topLevelPlayer = users.reduce(
+            (top, u) =>
+                (Number(u.level) || 1) > (Number(top.level) || 1)
+                    ? u
+                    : top,
+            users[0]
+        );
+
+        // ============================================
+        // 💰 ЭКОНОМИКА
+        // ============================================
+
+        const totalGold = users.reduce(
+            (sum, u) => sum + (Number(u.gold) || 0),
+            0
+        );
+
+        const totalCoins = users.reduce(
+            (sum, u) => sum + (Number(u.coins) || 0),
+            0
+        );
+
+        const totalFood = users.reduce(
+            (sum, u) => sum + (Number(u.food) || 0),
+            0
+        );
+
+        // ============================================
+        // 👥 РЕФЕРАЛЫ
+        // ============================================
+
+        const totalReferrals = users.reduce(
+            (sum, u) => sum + (u.referrals?.length || 0),
+            0
+        );
+
+        const playersWithReferrals = users.filter(
+            u => (u.referrals?.length || 0) > 0
+        ).length;
+
+        // ============================================
+        // 🌳 ТЕХНОЛОГИИ
+        // ============================================
+
+        const economyLevels = users.reduce(
+            (sum, u) => sum + (Number(u.techTree?.economy) || 0),
+            0
+        );
+
+        const armyLevels = users.reduce(
+            (sum, u) => sum + (Number(u.techTree?.army) || 0),
+            0
+        );
+
+        const cultureLevels = users.reduce(
+            (sum, u) => sum + (Number(u.techTree?.culture) || 0),
+            0
+        );
+
+        // ============================================
+        // 📦 ПОРТ
+        // ============================================
+
+        let activeOffers = 0;
+        let totalOffers = 0;
+
+        try {
+            const { readOffers } = require('../utils/portStorage');
+            const offersData = readOffers();
+
+            const offers = offersData?.offers || [];
+            totalOffers = offers.length;
+
+            const now = Date.now();
+
+            activeOffers = offers.filter(
+                offer =>
+                    offer.status === 'active' &&
+                    offer.expiresAt > now
+            ).length;
+        } catch (err) {
+            console.error(
+                `⚠️ [STATS] Не удалось получить статистику порта: ${err.message}`
+            );
+        }
+
+        // ============================================
+        // 🏆 ТОП-3
+        // ============================================
+
+        const topPlayers = [...users]
+            .sort(
+                (a, b) =>
+                    (Number(b.level) || 1) -
+                    (Number(a.level) || 1)
+            )
+            .slice(0, 3);
+
+        // ============================================
+        // 📊 СРЕДНИЕ ЗНАЧЕНИЯ
+        // ============================================
+
+        const averageGold = Math.round(totalGold / totalPlayers);
+        const averageCitizens = Math.round(totalCitizens / totalPlayers);
+        const averageSoldiers = Math.round(totalSoldiers / totalPlayers);
+
+        // ============================================
+        // 🧹 ФОРМАТИРОВАНИЕ ЧИСЕЛ
+        // ============================================
+
+        const formatNumber = (value) => {
+            if (!Number.isFinite(value)) return '0';
+
+            if (Math.abs(value) >= 1e15) {
+                return value.toExponential(2);
+            }
+
+            return Math.floor(value).toLocaleString('ru-RU');
+        };
+
+        // ============================================
+        // 🏆 ФОРМИРУЕМ ТОП
+        // ============================================
+
+        let topText = '';
+
+        const medals = ['🥇', '🥈', '🥉'];
+
+        topPlayers.forEach((player, index) => {
+            topText +=
+                `${medals[index]} ${player.nickname || player.username || 'Игрок'} — ` +
+                `ур. ${formatNumber(Number(player.level) || 1)}\n`;
+        });
+
+        // ============================================
+        // 📋 ИТОГОВЫЙ ТЕКСТ
+        // ============================================
+
+        const text =
+            `📊 СТАТИСТИКА АНТИЧНОГО ГРАДОНАЧАЛЬНИКА\n\n` +
+
+            `👥 ИГРОКИ\n` +
+            `├ Всего: ${formatNumber(totalPlayers)}\n` +
+            `├ VIP: ${formatNumber(vipCount)}\n` +
+            `└ С рефералами: ${formatNumber(playersWithReferrals)}\n\n` +
+
+            `🏛️ ГОРОДА\n` +
+            `├ Средний уровень: ${formatNumber(averageLevel)}\n` +
+            `├ Максимальный уровень: ${formatNumber(maxLevel)}\n` +
+            `├ Зданий построено: ${formatNumber(totalBuildings)}\n` +
+            `└ Жителей: ${formatNumber(totalCitizens)}\n\n` +
+
+            `⚔️ АРМИЯ\n` +
+            `├ Всего солдат: ${formatNumber(totalSoldiers)}\n` +
+            `├ Средняя армия: ${formatNumber(averageSoldiers)}\n` +
+            `└ Побед над боссами: ${formatNumber(totalBossKills)}\n\n` +
+
+            `💰 ЭКОНОМИКА\n` +
+            `├ Золото: ${formatNumber(totalGold)}\n` +
+            `├ Средний баланс: ${formatNumber(averageGold)}\n` +
+            `├ Монеты: ${formatNumber(totalCoins)}\n` +
+            `└ Еда: ${formatNumber(totalFood)}\n\n` +
+
+            `🌳 ВЕТВИ РАЗВИТИЯ\n` +
+            `├ Экономика: ${formatNumber(economyLevels)} ур.\n` +
+            `├ Армия: ${formatNumber(armyLevels)} ур.\n` +
+            `└ Культура: ${formatNumber(cultureLevels)} ур.\n\n` +
+
+            `📦 ПОРТ\n` +
+            `├ Активных лотов: ${formatNumber(activeOffers)}\n` +
+            `└ Всего лотов: ${formatNumber(totalOffers)}\n\n` +
+
+            `👥 РЕФЕРАЛЫ\n` +
+            `└ Всего приглашений: ${formatNumber(totalReferrals)}\n\n` +
+
+            `🏆 ТОП-3 ПО УРОВНЮ\n` +
+            `${topText}\n` +
+
+            `👑 ЛИДЕР\n` +
+            `└ ${topLevelPlayer.nickname || topLevelPlayer.username || 'Игрок'} — ` +
+            `ур. ${formatNumber(maxLevel)}`;
+
+        await ctx.reply(text);
     });
 
     // ===== /GIVE_GOLD =====

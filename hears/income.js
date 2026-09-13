@@ -1,5 +1,5 @@
 const { getUser, saveUser } = require('../utils/storage');
-const { calculateIncome, isVIP, getIncomeInterval } = require('../utils/helpers');
+const { calculateIncome, isVIP, getIncomeInterval, clampResources } = require('../utils/helpers');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
 
@@ -30,16 +30,20 @@ module.exports = {
         const income = calculateIncome(user);
         // Применяем доход
         user.gold += income.gold;
+
         user.food += income.food;
+        user.food -= income.foodEaten;
+        if (user.food < 0) user.food = 0;
+        
         user.coins += income.coins;
         // Железо и металл, если есть
         if (income.iron) user.iron = (user.iron || 0) + income.iron;
         if (income.metal) user.metal = (user.metal || 0) + income.metal;
         user.lastIncome = now;
-
+        clampResources(user)
         // VIP статус
         const vip = isVIP(user);
-        let vipText = vip ? '\n👑 VIP ×1.33!' : '';
+        let vipText = vip ? '\n👑 VIP ×1.2!' : '';
 
         // Квесты
         const questResult = updateQuestProgress(user, 'income', 1);

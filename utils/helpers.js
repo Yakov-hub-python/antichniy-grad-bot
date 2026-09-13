@@ -66,10 +66,34 @@ function applyWealthTax(user) {
 }
 
 // ============================================================
+// ЗАЩИТА ОТ ПЕРЕПОЛНЕНИЯ
+// ============================================================
+
+const MAX_SAFE = 1000000000000000
+//    Это максимальное значение для любого ресурса.
+
+function clampResources(user){
+    if(!user) return user
+    if(user.gold > MAX_SAFE){
+        user.gold = MAX_SAFE
+    }
+    if(user.food > MAX_SAFE){
+        user.food = MAX_SAFE
+    }
+    if(user.coins > MAX_SAFE){
+        user.coins = MAX_SAFE
+    }
+    return user
+}
+// ============================================================
 // 4️⃣ РАСЧЁТ ДОХОДА
 // ============================================================
 
 function calculateIncome(user) {
+    if (!user) {
+        return { gold: 0, food: 0, coins: 0, iron: 0, deserters: 0, foodEaten: 0, tax: 0 };
+    }
+    clampResources(user);
     const buildings = user.buildings || {};
     const citizens = user.citizens || 5;
     const soldiers = user.soldiers || 0;
@@ -206,16 +230,23 @@ function calculateIncome(user) {
     if (tax > 0) {
         console.log(`💰 Налог: ${tax} монет у пользователя ${user.id}`);
     }
-
+    clampResources(user);
     return {
         gold: Math.floor(gold),
-        food: Math.floor(finalFood),
+        food: Math.floor(food),
+        foodEaten: Math.floor(totalFoodNeeded), 
         coins: Math.floor(coins),
         iron: Math.floor(iron),
         deserters,
-        foodEaten: Math.floor(totalFoodNeeded),
         tax
     };
+}
+async function sendOrEdit(ctx, text, options = {}) {
+    if (ctx.callbackQuery) {
+        return ctx.editMessageText(text, options);
+    }
+
+    return ctx.reply(text, options);
 }
 
 module.exports = {
@@ -227,5 +258,8 @@ module.exports = {
     getDiminishedIncome,
     getProgressivePrice,
     applyWealthTax,
-    calculateIncome
+    clampResources,
+    calculateIncome,
+    sendOrEdit,
+    MAX_SAFE
 };
