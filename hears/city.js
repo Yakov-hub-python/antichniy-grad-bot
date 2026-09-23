@@ -8,7 +8,7 @@ module.exports = {
         if (!user) return ctx.reply('❌ Сначала запусти бота командой /start');
 
         // Рассчитываем доход
-        const income = calculateIncome(user);
+        const income = calculateIncome(user, { preview: true });
 
         // --- Формируем текст города ---
         const vipStatus = isVIP(user) ? '✅ Активен' : '❌ Не активен';
@@ -21,7 +21,6 @@ module.exports = {
         reply += `🪙 Монеты: ${user.coins}\n`;
         reply += `👥 Жители: ${user.citizens}\n`;
         reply += `🍖 Еда: ${user.food} (${foodStatus})\n`;
-        reply += `🪖 Солдаты: ${soldiers}\n`;
         reply += `🏗️ Уровень: ${user.level}\n`;
         reply += `👑 VIP: ${vipStatus}\n\n`;
         reply += `📊 Доход за сбор:\n`;
@@ -38,6 +37,8 @@ module.exports = {
                 inline_keyboard: [
                     [{ text: '💰 Собрать доход', callback_data: 'collect_income' }],
                     [{ text: '🏗️ Строительство', callback_data: 'build_menu' }],
+                    [{ text: '⚔️ Тренировка армии', callback_data: 'training_show' }],
+                    [{text: '🔬 Ветки технологий', callback_data: 'branch_show'}],
                     [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
                 ]
             }

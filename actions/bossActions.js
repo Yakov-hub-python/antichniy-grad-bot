@@ -1,185 +1,169 @@
-const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
-const { getSoldiers, getPersonalBossHP, getBossReward } = require('../utils/helpers');
-const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
-const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
+const {
+    getUser,
+    saveUser,
+    readDB,
+    writeDB
+} = require('../utils/storage');
 
-module.exports = {
-    // ============================================================
-    // 1️⃣ ЛИЧНЫЙ БОСС
-    // ============================================================
-    
-    attackPersonal: async (ctx) => {
-        const userId = ctx.from.id;
-        const user = getUser(userId);
-        const personal = user.personalBoss || { hp: 5000, maxHp: 5000, respawnAt: 0, kills: 0 };
+const {
+    getSoldiers,
+    getPersonalBossHP,
+    getBossReward
+} = require('../utils/helpers');
 
-        if (personal.respawnAt > Date.now()) {
-            const left = Math.floor((personal.respawnAt - Date.now()) / 60000);
-            return ctx.reply(`⏳ Личный босс перерождается через ${left} минут`);
-        }
+const {
+    updateQuestProgress,
+    claimQuestReward
+} = require('../utils/quests');
 
-        const soldiers = getSoldiers(user);
-        const damage = soldiers * 3;
-        personal.hp -= damage;
+const {
+    checkAchievements,
+    claimAchievementReward
+} = require('../utils/achievements');
 
-        if (personal.hp <= 0) {
-            personal.hp = getPersonalBossHP(user);
-            personal.respawnAt = Date.now() + 3 * 60 * 60 * 1000;
-            personal.kills = (personal.kills || 0) + 1;
+const {
+    getArmyToType
+} = require('../config/army');
 
-            const reward = getBossReward(user);
-            user.gold += reward;
-            user.bossKills = (user.bossKills || 0) + 1;
+const {
+    giveBattleReward
+} = require('../service/battleService');
 
-            if (Math.random() < 0.1) {
-                user.vip = { active: true, expiresAt: Date.now() + 24 * 60 * 60 * 1000 };
-                await ctx.reply(`🎉 Ты получил VIP на 1 день за убийство личного босса!`);
-            }
 
-            user.personalBoss = personal;
-            saveUser(userId, user);
+// ============================================================
+// НОВАЯ БОЕВАЯ СИСТЕМА
+// ============================================================
 
-            // Квест
-            const questResult = updateQuestProgress(user, 'boss');
-            if (questResult?.completed) {
-                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
-                claimQuestReward(user);
-            }
+const { getBossForUser } = require('../config/boss');
 
-            // Достижения
-            const newAchievements = checkAchievements(user);
-            for (const ach of newAchievements) {
-                await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
-                claimAchievementReward(user, ach);
-                await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
-            }
+const BATTLE_INTERVAL = 1000;
 
-            await ctx.reply(
-                `⚔️ ЛИЧНЫЙ БОСС ПОВЕРЖЕН!\n` +
-                `💰 +${reward} золота!\n` +
-                `🏆 Убийств: ${personal.kills}\n` +
-                `⏳ Следующий через 3 часа.`
-            );
-        } else {
-            user.personalBoss = personal;
-            saveUser(userId, user);
-            
-            // Если урон > 0 — обновляем сообщение
-            if (damage > 0) {
-                const keyboard = {
-                    inline_keyboard: [
-                        [{ text: '⚔️ Атаковать снова', callback_data: 'boss_personal' }]
-                    ]
-                };
-                await ctx.editMessageText(
-                    `⚔️ Ты нанёс ${damage} урона! Осталось HP: ${personal.hp}`,
-                    { reply_markup: keyboard }
-                );
-            } else {
-                // Если урон 0 — показываем уведомление и не редактируем сообщение
-                await ctx.answerCbQuery('❌ У тебя нет солдат! Найми их в казарме.');
-                // Можно также оставить сообщение без изменений
-            }
-        }
-    },
 
-    // ============================================================
-    // 2️⃣ ГЛОБАЛЬНЫЙ БОСС
-    // ============================================================
+// ============================================================
+// ЗАПУСК НОВОГО БОЯ
+// ============================================================
 
-    attackGlobal: async (ctx) => {
-        const userId = ctx.from.id;
-        const user = getUser(userId);
-        const db = readDB();
-        const global = db.globalBoss || { 
-            hp: 5000,
-            maxHp: 5000,
-            active: true, 
-            participants: [] 
-        };
+async function start(ctx) {
+    const userId = ctx.from.id;
+    const user = getUser(userId);
 
-        if (!global.active) {
-            return ctx.reply('💤 Глобальный босс повержен. Следующий в 00:00, 06:00, 12:00 или 18:00.');
-        }
+    if (!user) {
+        return ctx.reply('❌ Профиль не найден.');
+    }
 
-        const soldiers = getSoldiers(user);
-        const damage = soldiers * 2;
-        global.hp -= damage;
-        if (global.hp < 0) global.hp = 0;
+    // Уже есть бой
+    if (user.activeBattle) {
+        return ctx.reply(
+            '⚔️ У тебя уже идёт бой!\n\n' +
+            `👹 ${user.activeBattle.boss.name}\n` +
+            `❤️ HP: ${user.activeBattle.boss.hp}/${user.activeBattle.boss.maxHp}\n\n` +
+            'Бой проходит автоматически.'
+        );
+    }
 
-        if (!global.participants) global.participants = [];
-        const existing = global.participants.find(p => p.id === userId);
-        if (existing) {
-            existing.damage += damage;
-        } else {
-            global.participants.push({ id: userId, damage: damage });
-        }
+    // Проверяем армию
+    const army = user.army || {};
 
-        if (global.hp <= 0) {
-            // ===== БОСС УБИТ =====
-            global.active = false;
-            const sorted = global.participants.sort((a, b) => b.damage - a.damage);
-            const top = sorted.slice(0, 3);
+    const totalArmy = Object.values(army)
+        .reduce((sum, count) => sum + (Number(count) || 0), 0);
 
-            // ===== НАГРАДЫ ТОП-3 =====
-            for (let i = 0; i < top.length; i++) {
-                const player = getUser(top[i].id);
-                if (i === 0) {
-                    player.vip = { 
-                        active: true, 
-                        expiresAt: Date.now() + 3 * 24 * 60 * 60 * 1000 
-                    };
-                    player.gold += 3000;
-                    await ctx.telegram.sendMessage(top[i].id, 
-                        '🏆 Ты занял 1 место!\n👑 VIP на 3 дня\n💰 +3000 золота!'
-                    );
-                } else {
-                    player.gold += 2000;
-                    await ctx.telegram.sendMessage(top[i].id, 
-                        `🥈 ${i+1} место! +2000 золота!`
-                    );
-                }
-                saveUser(top[i].id, player);
-            }
+    if (totalArmy <= 0) {
+        return ctx.reply(
+            '❌ У тебя нет армии.\n\n' +
+            'Сначала найми войска.'
+        );
+    }
 
-            // ===== ВСЕМ УЧАСТНИКАМ =====
-            const share = Math.floor(5000 / (global.participants.length || 1));
-            for (const p of global.participants) {
-                const player = getUser(p.id);
-                player.coins += share;
-                saveUser(p.id, player);
-            }
+    const now = Date.now();
+    const boss = getBossForUser(user);
 
-            // ===== ОБНОВЛЯЕМ БАЗУ: БОСС МЁРТВ, НЕ ПЕРЕСОЗДАЁМ =====
-            db.globalBoss = global;
-            writeDB(db);
+    user.activeBattle = {
+        boss: {
+            ...boss
+        },
 
-            // ===== КВЕСТ ДЛЯ АТАКУЮЩЕГО =====
-            const freshUser = getUser(userId);
-            const questResult = updateQuestProgress(freshUser, 'boss');
-            if (questResult?.completed) {
-                await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
-                claimQuestReward(freshUser);
-            }
+        round: 0,
 
-            // ===== ДОСТИЖЕНИЯ ДЛЯ АТАКУЮЩЕГО =====
-            const newAchievements = checkAchievements(freshUser);
-            for (const ach of newAchievements) {
-                await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
-                claimAchievementReward(freshUser, ach);
-                await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
-            }
+        startedAt: now,
 
-            await ctx.reply(
-                `🌍 ГЛОБАЛЬНЫЙ БОСС ПОВЕРЖЕН АДМИНОМ!\n` +
-                `\n` +
-                `⏳ Следующий появится не скоро.`
-            );
-        } else {
-            // ===== БОСС ЕЩЁ ЖИВ =====
-            db.globalBoss = global;
-            writeDB(db);
-            await ctx.reply(`⚔️ Урон: ${damage}. Осталось HP: ${global.hp}/${global.maxHp}`);
+        nextRoundAt: now + BATTLE_INTERVAL,
+
+        lossDamage: 0,
+
+        totalPlayerDamage: 0,
+
+        totalBossDamage: 0,
+
+        totalLosses: {}
+    };
+
+    saveUser(userId, user);
+
+    return ctx.reply(
+        `⚔️ БОЙ НАЧАЛСЯ!\n\n` +
+        `👹 ${boss.name} #${boss.level}\n` +
+        `❤️ HP: ${boss.hp}/${boss.maxHp}\n` +
+        `⚔️ Урон: ${boss.damage}\n` +
+        `🛡️ Защита: ${boss.defense}\n\n` +
+        `⏳ Первый раунд через 1 секунду.\n` +
+        `⚔️ Бой проходит автоматически.`
+    );
+}
+
+
+// ============================================================
+// СОВМЕСТИМОСТЬ СО СТАРЫМ CALLBACK boss_attack
+// ============================================================
+//
+// Старый callback может остаться в callback.js.
+// Он больше НЕ проводит раунд вручную.
+// Это важно, чтобы игрок случайно не ускорял бой.
+//
+
+async function attack(ctx) {
+    const userId = ctx.from.id;
+    const user = getUser(userId);
+
+    if (!user?.activeBattle) {
+        return ctx.reply(
+            '❌ У тебя нет активного боя.'
+        );
+    }
+
+    return ctx.reply(
+        '⚔️ Бой уже идёт автоматически.\n' +
+        '⏳ Следующий раунд будет проведён системой.'
+    );
+}
+
+
+// ============================================================
+// ФОРМАТ ПОТЕРЬ
+// ============================================================
+
+function formatLosses(losses) {
+    let text = '';
+
+    for (const [unit, count] of Object.entries(losses || {})) {
+        if (count <= 0) continue;
+
+        const unitInfo = getArmyToType(unit);
+
+        if (unitInfo) {
+            text += `${unitInfo.name}: −${count}\n`;
         }
     }
+
+    return text || 'Нет потерь 🎉';
+}
+
+
+// ============================================================
+// EXPORTS
+// ============================================================
+
+module.exports = {
+    start,
+    attack,
+    formatLosses
 };

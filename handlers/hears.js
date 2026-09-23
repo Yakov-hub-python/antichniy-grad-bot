@@ -3,6 +3,7 @@ const { showMainMenu } = require('../handlers/menu');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { advanceTraining } = require('../utils/training');
 const about = require('../hears/about');
+const { getMarketCommission, calculateMarketSellPayout, calculateMarketBuyCost, addWarriors, syncSoldierCount, getEconomyBonuses } = require('../utils/helpers');
 
 module.exports = (bot) => {
 
@@ -27,10 +28,11 @@ module.exports = (bot) => {
             return ctx.reply(`❌ У тебя только ${user.food} еды`);
         }
 
+        const payout = calculateMarketSellPayout(user, amount, 1);
         user.food -= amount;
-        user.gold += amount;
+        user.gold += payout.earned;
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Продано ${amount} еды за ${amount}💰`);
+        await ctx.reply(`✅ Продано ${amount} еды за ${payout.earned}💰`);
     });
 
     bot.hears(/продать монеты (\d+)/, async (ctx) => {
@@ -41,11 +43,11 @@ module.exports = (bot) => {
         if (user.coins < amount) {
             return ctx.reply(`❌ У тебя только ${user.coins} монет`);
         }
-
+        const payout = calculateMarketSellPayout(user, amount, 3);
         user.coins -= amount;
-        user.gold += amount * 3;
+        user.gold += payout.earned;
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Продано ${amount} монет за ${amount * 3}💰`);
+        await ctx.reply(`✅ Продано ${amount} монет за ${payout.earned}💰`);
     });
 
     bot.hears(/продать еда все/, async (ctx) => {
@@ -56,10 +58,11 @@ module.exports = (bot) => {
             return ctx.reply('❌ У тебя нет еды');
         }
 
+        const payout = calculateMarketSellPayout(user, amount, 1);
         user.food = 0;
-        user.gold += amount;
+        user.gold += payout.earned;
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Продано ${amount} еды за ${amount}💰`);
+        await ctx.reply(`✅ Продано ${amount} еды за ${payout.earned}💰`);
     });
 
     bot.hears(/продать монеты все/, async (ctx) => {
@@ -69,11 +72,12 @@ module.exports = (bot) => {
         if (amount === 0) {
             return ctx.reply('❌ У тебя нет монет');
         }
-
+        const commission = getMarketCommission(user);
+        const fee = Math.floor(amount * commission);
         user.coins = 0;
-        user.gold += amount * 3;
+        user.gold += amount * 3 - fee;
         await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Продано ${amount} монет за ${amount * 3}💰`);
+        await ctx.reply(`✅ Продано ${amount} монет за ${amount * 3 - fee}💰`);
     });
 
     // ============================================================
@@ -84,7 +88,7 @@ module.exports = (bot) => {
         const match = ctx.message.text.match(/купить еда (\d+)/);
         const amount = parseInt(match[1]);
         const user = await getUser(ctx.from.id);
-        const cost = amount * 2;
+        const cost = calculateMarketBuyCost(user, amount, 2);
 
         if (user.gold < cost) {
             return ctx.reply(`❌ Нужно ${cost}💰, у тебя ${user.gold}💰`);
@@ -100,7 +104,7 @@ module.exports = (bot) => {
         const match = ctx.message.text.match(/купить монеты (\d+)/);
         const amount = parseInt(match[1]);
         const user = await getUser(ctx.from.id);
-        const cost = amount * 6;
+        const cost = calculateMarketBuyCost(user, amount, 6);
 
         if (user.gold < cost) {
             return ctx.reply(`❌ Нужно ${cost}💰, у тебя ${user.gold}💰`);
@@ -161,6 +165,10 @@ module.exports = (bot) => {
         const { BUILDING_COSTS, MAX_BUILDINGS, BUILDING_NAMES } = require('../config/constants');
 
         const baseCost = BUILDING_COSTS[buildingKey];
+        if (!baseCost) return ctx.reply('❌ Неизвестное здание.');
+        if ((user.level || 1) < (baseCost.level || 1)) {
+            return ctx.reply(`❌ Для этого здания нужен ${baseCost.level || 1} уровень города. У тебя ${user.level || 1}.`);
+        }
         const currentCount = user.buildings[buildingKey] || 0;
 
         if (MAX_BUILDINGS[buildingKey] !== undefined && currentCount + count > MAX_BUILDINGS[buildingKey]) {
@@ -177,6 +185,11 @@ module.exports = (bot) => {
             totalCoins += getProgressivePrice(baseCost.coins || 0, idx);
             totalIron += getProgressivePrice(baseCost.iron || 0, idx);
         }
+
+        const discount = getEconomyBonuses(user).buildDiscount;
+        totalGold = Math.floor(totalGold * (1 - discount));
+        totalCoins = Math.floor(totalCoins * (1 - discount));
+        totalIron = Math.floor(totalIron * (1 - discount));
 
         if (user.gold < totalGold) {
             return ctx.reply(`❌ Нужно ${totalGold}💰, у тебя ${user.gold}💰`);
@@ -196,7 +209,7 @@ module.exports = (bot) => {
         if (buildingKey === 'hut') user.citizens += count * 3;
         if (buildingKey === 'house') user.citizens += count * 5;
         if (buildingKey === 'tavern') user.citizens += count * 2;
-        if (buildingKey === 'barracks') user.soldiers += count * 2;
+        if (buildingKey === 'barracks') addWarriors(user, count * 2);
         if (buildingKey === 'acropolis') {
             user.acropolisBuilt = true;
             user.acropolisBuiltDate = Date.now();
@@ -282,6 +295,10 @@ module.exports = (bot) => {
         const { BUILDING_COSTS, MAX_BUILDINGS, BUILDING_NAMES } = require('../config/constants');
 
         const baseCost = BUILDING_COSTS[buildingKey];
+        if (!baseCost) return ctx.reply('❌ Неизвестное здание.');
+        if ((user.level || 1) < (baseCost.level || 1)) {
+            return ctx.reply(`❌ Для этого здания нужен ${baseCost.level || 1} уровень города. У тебя ${user.level || 1}.`);
+        }
         const currentCount = user.buildings[buildingKey] || 0;
 
         if (MAX_BUILDINGS[buildingKey] !== undefined && currentCount >= MAX_BUILDINGS[buildingKey]) {
@@ -290,27 +307,31 @@ module.exports = (bot) => {
 
         const price = getProgressivePrice(baseCost.gold || 0, currentCount);
         const priceCoins = getProgressivePrice(baseCost.coins || 0, currentCount);
-        const priceIron = getProgressivePrice(baseCost.iron || 0, currentCount);
+        let priceIron = getProgressivePrice(baseCost.iron || 0, currentCount);
+        const discount = getEconomyBonuses(user).buildDiscount;
+        const discountedPrice = Math.floor(price * (1 - discount));
+        const discountedCoins = Math.floor(priceCoins * (1 - discount));
+        priceIron = Math.floor(priceIron * (1 - discount));
 
-        if (user.gold < price) {
-            return ctx.reply(`❌ Нужно ${price}💰, у тебя ${user.gold}💰`);
+        if (user.gold < discountedPrice) {
+            return ctx.reply(`❌ Нужно ${discountedPrice}💰, у тебя ${user.gold}💰`);
         }
-        if (user.coins < priceCoins) {
-            return ctx.reply(`❌ Нужно ${priceCoins}🪙, у тебя ${user.coins}🪙`);
+        if (user.coins < discountedCoins) {
+            return ctx.reply(`❌ Нужно ${discountedCoins}🪙, у тебя ${user.coins}🪙`);
         }
         if (user.iron < priceIron) {
             return ctx.reply(`❌ Нужно ${priceIron}⛏️, у тебя ${user.iron || 0}⛏️`);
         }
 
-        user.gold -= price;
-        user.coins -= priceCoins;
+        user.gold -= discountedPrice;
+        user.coins -= discountedCoins;
         user.iron -= priceIron;
         user.buildings[buildingKey] += 1;
 
         if (buildingKey === 'hut') user.citizens += 3;
         if (buildingKey === 'house') user.citizens += 5;
         if (buildingKey === 'tavern') user.citizens += 2;
-        if (buildingKey === 'barracks') user.soldiers += 2;
+        if (buildingKey === 'barracks') addWarriors(user, 2);
         if (buildingKey === 'acropolis') {
             user.acropolisBuilt = true;
             user.acropolisBuiltDate = Date.now();
@@ -429,7 +450,7 @@ module.exports = (bot) => {
             return ctx.reply(`❌ Нельзя нанять больше ${MAX_SOLDIERS} солдат. У тебя уже ${user.soldiers}.`);
         }
 
-        const cost = amount * 6;
+        const cost = calculateMarketBuyCost(user, amount, 6);
         const ingotCost = amount * 1;
 
         if (user.coins < cost) {
@@ -441,7 +462,7 @@ module.exports = (bot) => {
 
         user.coins -= cost;
         user.ingot -= ingotCost;
-        user.soldiers += amount;
+        addWarriors(user, amount);
         await saveUser(ctx.from.id, user);
         await ctx.reply(`✅ Нанято ${amount} солдат за ${cost} монет и ${ingotCost} слитков`);
     });
@@ -469,7 +490,7 @@ module.exports = (bot) => {
 
         user.coins -= cost;
         user.ingot -= ingotCost;
-        user.soldiers += finalAmount;
+        addWarriors(user, finalAmount);
         await saveUser(ctx.from.id, user);
         await ctx.reply(`✅ Нанято ${finalAmount} солдат за ${cost} монет и ${ingotCost} слитков`);
     });
@@ -480,12 +501,11 @@ module.exports = (bot) => {
 
     bot.hears(/атаковать босса/, async (ctx) => {
         const bossActions = require('../actions/bossActions');
-        await bossActions.attackPersonal(ctx);
+        await bossActions.start(ctx);
     });
 
     bot.hears(/атаковать глобального/, async (ctx) => {
-        const bossActions = require('../actions/bossActions');
-        await bossActions.attackGlobal(ctx);
+        await ctx.reply('ℹ️ Глобальный босс удалён в версии 1.6.2. Теперь используется личная прогрессия боссов.');
     });
 
     // ============================================================

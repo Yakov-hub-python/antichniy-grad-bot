@@ -26,7 +26,7 @@ commands(bot);
 bot.command('question', startQuiz);
 hears(bot);
 callbacks(bot);
-
+require('./service/battleProcessor').startBattleProcessor(bot);
 
 function log(type, message) {
     const time = new Date().toLocaleString('ru-RU');
@@ -50,7 +50,8 @@ bot.on('text', async (ctx) => {
 // ===== ОШИБКИ TELEGRAF =====
 bot.catch((err, ctx) => {
     if (err.response?.error_code === 429) {
-        console.warn(`⏳ Лимит запросов`);
+        const retryAfter = err.response?.parameters?.retry_after;
+        console.warn(`⏳ Telegram 429: повторить через ${retryAfter ?? 'неизвестно'} сек.`);
         return;
     }
     log('ERROR', `❌ ${err.message}`);

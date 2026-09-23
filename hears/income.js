@@ -2,6 +2,7 @@ const { getUser, saveUser } = require('../utils/storage');
 const { calculateIncome, isVIP, getIncomeInterval, clampResources } = require('../utils/helpers');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
+const { completeAction } = require('../handlers/tutorial');
 
 module.exports = {
     collect: async (ctx) => {
@@ -41,9 +42,10 @@ module.exports = {
         if (income.metal) user.metal = (user.metal || 0) + income.metal;
         user.lastIncome = now;
         clampResources(user)
-        // VIP статус
+        // ===== VIP статус =====
         const vip = isVIP(user);
         let vipText = vip ? '\n👑 VIP ×1.2!' : '';
+        
 
         // Квесты
         const questResult = updateQuestProgress(user, 'income', 1);
@@ -75,15 +77,17 @@ module.exports = {
 
         const reply_markup = {
             inline_keyboard: [
-                [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
+                [{ text: '🏘️ В город', callback_data: 'city_show' }], 
+                [{ text: '🔙 В меню', callback_data: 'back_to_menu' }]
             ]
         };
-
+        
         if (ctx.callbackQuery) {
             await ctx.editMessageText(text, { reply_markup });
             await ctx.answerCbQuery();
         } else {
             await ctx.reply(text, { reply_markup });
         }
+        await completeAction(ctx, 'collect_income');
     }
 };

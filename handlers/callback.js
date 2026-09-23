@@ -1,15 +1,24 @@
 const marketActions = require('../actions/marketActions');
 const { getUser, saveUser } = require('../utils/storage');
-const { MAIN_MENU } = require('../config/constants');
-const { getSoldiers } = require('../utils/helpers');
+const { getSoldiers, sendOrEdit, addWarriors } = require('../utils/helpers');
 const { showMainMenu } = require('../handlers/menu');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
+const { hireArmy } = require('../service/armyService');
+const tutorial = require('../handlers/tutorial');
 
 module.exports = (bot) => {
     bot.action('market_sell_food', marketActions.sellFood);
     bot.action('market_sell_coins', marketActions.sellCoins);
     bot.action('market_buy_food', marketActions.buyFood);
     bot.action('market_buy_coins', marketActions.buyCoins);
+
+    bot.action('guide', async (ctx) => {
+        await require('./guide').show(ctx, 'main');
+    });
+
+    bot.action(/^guide:(main|resources|buildings|economy|army|boss|trade)$/, async (ctx) => {
+        await require('./guide').show(ctx, ctx.match[1]);
+    });
 
     bot.action('back_to_menu', async (ctx) => {
         await ctx.answerCbQuery();
@@ -24,32 +33,25 @@ module.exports = (bot) => {
     bot.action('collect_income', require('../hears/income').collect);
     bot.action('copy_ref', require('../actions/referralActions').copy);
 
-    bot.action('boss_personal', require('../actions/bossActions').attackPersonal);
-    bot.action('boss_global', require('../actions/bossActions').attackGlobal);
+    bot.action('boss_start', require('../actions/bossActions').start);
+
 
     bot.action(/^hire_warriors_(\d+)$/, async (ctx) => {
         const count = parseInt(ctx.match[1]);
         const userId = ctx.from.id;
         const user = getUser(userId);
-        const cost = count * 6;
+        const success = hireArmy(user, 'warriors', count);
 
-        if (user.coins < cost) {
-            return ctx.reply(`❌ Нужно ${cost} монет!`);
+        if (!success) {
+            return ctx.reply('❌ Не удалось нанять мечников. Нужна 1 уровень ветки армии, достаточно золота/еды и свободный лимит.');
         }
 
-        user.coins -= cost;
-        user.soldiers += count;
-        saveUser(userId, user);
-
-        const questResult = updateQuestProgress(user, 'spend', cost);
-        if (questResult?.completed) {
-            await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
-            claimQuestReward(user);
-        }
-
-        await ctx.reply(`🪖 ${count} солдат нанято! Солдат: ${getSoldiers(user)}`);
+        await sendOrEdit(
+            ctx,
+            `✅ Нанято мечников: ${count}\n🪖 Всего солдат: ${getSoldiers(user)}\n💰 Золото: ${user.gold}\n🍖 Еда: ${user.food}`,
+            { reply_markup: { inline_keyboard: [[{ text: '🔙 Назад', callback_data: 'barracks_show' }]] } }
+        );
     });
-
     bot.action('city_show', async (ctx) => {
         await ctx.answerCbQuery();
         await require('../hears/city').show(ctx);
@@ -79,27 +81,44 @@ module.exports = (bot) => {
         await require('../hears/about').show(ctx);
     });
     bot.action('barracks_show', async (ctx) => {
-        await ctx.answerCbQuery();
-        const user = getUser(ctx.from.id);
-        const soldiers = getSoldiers(user);
-        await ctx.reply(
-            `🪖 КАЗАРМА\n\n` +
-            `🪖 Солдаты: ${soldiers}\n` + 
-            `💰 Цена: 1 воин = 6 монет\n\n` +
-            `⚔️ Каждый солдат даёт 5 урона боссам.`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'Нанять воинов', callback_data: 'hire_warriors_1' }],
-                        [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-                    ]
-                }
-            }
-        );
+        await require('../hears/barracks').show(ctx);
     });
 
     bot.action('olymp_show', async (ctx) => {
         await ctx.answerCbQuery();
         await require('../hears/olymp').show(ctx);
     });
+    bot.action('port_show', async(ctx) => {
+        await ctx.answerCbQuery()
+        await require('../handlers/port').port(ctx)
+    })
+    bot.action('branch_show', async(ctx) => {
+        await ctx.answerCbQuery()
+        await require('../handlers/branch')(ctx)
+    })
+    bot.action('training_show', async(ctx) => {
+        await ctx.answerCbQuery()
+        await require('../handlers/trainingArmy').show(ctx)
+    });
+    bot.action(/^training_(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const type = ctx.match[1];
+        const user = getUser(ctx.from.id);
+        const success = hireArmy(user, type, 1);
+        if (!success) {
+            return ctx.reply('❌ Не удалось нанять войско.');
+        }
+        const buttons = [
+            [{ text: '🔙 Назад', callback_data: 'training_show' }],
+        ];
+        await sendOrEdit(ctx, '✅ Войско успешно нанято!', { reply_markup: { inline_keyboard: buttons } });
+    });
+    // ===== ОБУЧЕНИЕ =====
+
+
+
+    bot.action('tutorial_next', tutorial.nextStep);
+    bot.action('tutorial_skip', tutorial.skipTutorial);
+    bot.action('tutorial_finish', tutorial.finishTutorial);
+    bot.action('tutorial_restart', tutorial.restartTutorial);
 };

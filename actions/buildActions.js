@@ -1,10 +1,11 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
 const { BUILDING_COSTS, BUILDING_NAMES, MAX_BUILDINGS, TECH_TREE } = require('../config/constants');
-const { getProgressivePrice, getDiminishedIncome } = require('../utils/helpers');
+const { getProgressivePrice, getDiminishedIncome, addWarriors, getEconomyBonuses } = require('../utils/helpers');
 const { updateQuestProgress, claimQuestReward } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
-const { advanceTraining } = require('../utils/training');
 const city = require('../hears/city');
+const { completeAction } = require('../handlers/tutorial');
+
 
 module.exports = {
     build: async (ctx) => {
@@ -35,7 +36,7 @@ module.exports = {
         }
         
         // ===== ПРОГРЕССИВНАЯ ЦЕНА =====
-        const discount = TECH_TREE.economy.levels[user.techTree?.economy || 0]?.bonus?.buildDiscount || 0;
+        const discount = getEconomyBonuses(user).buildDiscount;
         const actualCost = {
             gold: Math.floor(getProgressivePrice(baseCost.gold, currentCount) * (1 - discount)),
             coins: Math.floor(getProgressivePrice(baseCost.coins, currentCount) * (1 - discount)),
@@ -74,7 +75,7 @@ module.exports = {
         if (type === 'hut') user.citizens += 3;
         if (type === 'house') user.citizens += 5;
         if (type === 'tavern') user.citizens += 2;
-        if (type === 'barracks') user.soldiers += 2;
+        if (type === 'barracks') addWarriors(user, 2);
         // Акрополь удалён — эффект больше не применяется
         if (type === 'walls') {
             user.walls = (user.walls || 0) + 1;
@@ -83,28 +84,12 @@ module.exports = {
             user.soldierDamage = (user.soldierDamage || 0) + 1;
         }
 
-        // ===== ОБУЧЕНИЕ =====
-        if (type === 'hut' || type === 'farm' || type === 'mine') {
-            const trainingResult = advanceTraining(user, 'build_' + type);
-            if (trainingResult) {
-                if (trainingResult.completed) {
-                    await ctx.reply(`🎉 ОБУЧЕНИЕ ЗАВЕРШЕНО!\n🏆 Награда: ${trainingResult.step.reward}💰\n\nТы готов к игре! 🏛️`);
-                } else {
-                    const nextStep = trainingResult.nextStep;
-                    await ctx.reply(
-                        `✅ Шаг ${trainingResult.step.id} выполнен!\n💰 +${trainingResult.step.reward} золота\n\n` +
-                        `📚 СЛЕДУЮЩИЙ ШАГ:\n${nextStep.title}\n${nextStep.description}\n\n` +
-                        `🏆 Награда: ${nextStep.reward}💰`
-                    );
-                }
-                saveUser(userId, user);
-            }
-        }
-
         // ===== КВЕСТЫ =====
         const questResult = updateQuestProgress(user, 'build', 1);
         if (questResult?.completed) {
-            await ctx.reply(`🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`);
+            await ctx.reply(
+                `🎉 КВЕСТ ВЫПОЛНЕН!\n${questResult.quest.name}\n🏆 Награда: ${questResult.quest.reward === 'vip_3' ? 'VIP 3 дня' : questResult.quest.reward + '💰'}`
+            );
             claimQuestReward(user);
         }
 
@@ -113,11 +98,22 @@ module.exports = {
         for (const ach of newAchievements) {
             await ctx.reply(`🏆 НОВОЕ ДОСТИЖЕНИЕ!\n${ach.name}\n${ach.description}`);
             claimAchievementReward(user, ach);
-            await ctx.reply(`🎁 Награда: ${ach.reward === 'vip_3' || ach.reward === 'vip_7' ? ach.reward.replace('_', ' ').toUpperCase() : ach.reward + '💰'}`);
+            await ctx.reply(
+                `🎁 Награда: ${
+                    ach.reward === 'vip_3' || ach.reward === 'vip_7'
+                        ? ach.reward.replace('_', ' ').toUpperCase()
+                        : ach.reward + '💰'
+                }`
+            );
         }
 
         // ===== СОХРАНЯЕМ =====
         saveUser(userId, user);
+
+        // ===== ОБУЧЕНИЕ =====
+        if (type === 'hut' || type === 'farm' || type === 'mine') {
+            await completeAction(ctx, 'build_' + type);
+        }
 
         await ctx.editMessageText(`
             ✅ ${BUILDING_NAMES[type]} построена! Уровень города: ${user.level}`, 

@@ -1,11 +1,12 @@
 const { getUser, saveUser, readDB, writeDB } = require('../utils/storage');
-const { getSoldiers, MAX_SAFE } = require('../utils/helpers');
+const { getSoldiers, MAX_SAFE, addWarriors, syncSoldierCount } = require('../utils/helpers');
 const fs = require('fs');
 const path = require('path');
 const { showMainMenu } = require('../handlers/menu');
 const branchHandler = require('./branch');
 const portHandlers = require('./port');
 const miracle = require('./miracle');
+const { getMarketCommission } = require('../utils/helpers');
 
 // ===== ПРОВЕРКА АДМИНА С ЛОГИРОВАНИЕМ =====
 function isAdmin(userId) {
@@ -63,94 +64,18 @@ module.exports = (bot) => {
     bot.command('my_offers', portHandlers.my_offers);
     bot.command('cancel_offer', portHandlers.cancel_offer);
 
-    // ===== ОБУЧЕНИЕ =====
-    bot.command('training', async (ctx) => {
-        const userId = ctx.from.id;
-        const user = getUser(userId);
-
-        const { getFirstStep, startTraining, isTrainingComplete } = require('../utils/training');
-
-        if (isTrainingComplete(user)) {
-            return ctx.reply('✅ Ты уже прошёл обучение! Начинай строить свой город.');
-        }
-
-        startTraining(user);
-        const step = getFirstStep();
-
-        const text = 
-            `📚 ОБУЧЕНИЕ: ШАГ 1 / 4\n\n` +
-            `${step.title}\n${step.description}\n\n` +
-            `🏆 Награда за выполнение: ${step.reward}💰\n\n` +
-            `👉 Выполни действие и получи награду!`;
-
-        saveUser(userId, user);
-        await ctx.reply(text);
+    // ===== /GUIDE =====
+    bot.command('guide', async (ctx) => {
+        await require('./guide').show(ctx);
     });
+
+    // ===== /TUTORIAL =====
+    bot.command('tutorial', require('../handlers/tutorial').startTutorial);
     // ===== /BARRACKS =====
-    bot.command('barracks', async (ctx) => {
-        const user = getUser(ctx.from.id);
-        const soldiers = getSoldiers(user);
-        await ctx.reply(
-            `🪖 КАЗАРМА\n\n` +
-            `🪖 Солдаты: ${soldiers}\n` + 
-            `💰 Цена: 1 воин = 6 монет\n\n` +
-            `⚔️ Каждый солдат даёт 5 урона боссам.`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'Нанять воинов', callback_data: 'hire_warriors_1' }],
-                        [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-                    ]
-                }
-            }
-        );
+    bot.command('army', async (ctx) => {
+        require('./trainingArmy').show(ctx)
     });
-    // ===== /HIRE =====
-    bot.command('hire', async (ctx) => {
-        const args = ctx.message.text.split(' ');
-        
-        // Проверка количества аргументов
-        if (args.length !== 2) {
-            return ctx.reply('❌ Используй: /hire <количество>');
-        }
-        
-        const amount = args[1].trim();
-        const number = Number(amount);
-        
-        // Проверка валидности числа
-        if (!Number.isInteger(number) || number <= 0) {
-            return ctx.reply('❌ Введите целое положительное число');
-        }
-        
-        // Максимальное количество (защита от спама)
-        const MAX_HIRE = 1000;
-        if (number > MAX_HIRE) {
-            return ctx.reply(`❌ Нельзя нанять больше ${MAX_HIRE} воинов за раз`);
-        }
-        
-        const user = getUser(ctx.from.id);
-        const cost = number * 6;
-        
-        if (!user) {
-            return ctx.reply('❌ Пользователь не найден');
-        }
-        
-        if (user.coins < cost) {
-            const needed = cost - user.coins;
-            return ctx.reply(`❌ Не хватает монет! Нужно еще ${needed} монет. Всего нужно: ${cost}`);
-        }
-        
-        // Выполняем операцию
-        user.coins -= cost;
-        user.soldiers += number;
-        saveUser(ctx.from.id, user);
-        
-        ctx.reply(
-            `✅ Нанято ${number} воинов за ${cost} монет\n` +
-            `📊 Всего воинов: ${user.soldiers}\n` +
-            `💰 Осталось монет: ${user.coins}`
-        );
-    });
+
     // ===== /HELP =====
     bot.command('help', async (ctx) => {
         await ctx.reply(
@@ -165,11 +90,13 @@ module.exports = (bot) => {
             `/daily — ежедневный бонус\n` +
             `/boss — боссы\n` +
             `/olymp — топ-10 игроков\n` +
-            `/profile — мой профиль\n\n` +
+            `/profile — мой профиль\n` +
+            `/guide — подробный гайд по механикам\n` +
+            `/tutorial — обучение для новичка\n` +
+            `/branch <economy|army> — ветви развития\n\n` +
 
             `🪖 АРМИЯ:\n` +
-            `/barracks — казарма\n` +
-            `/hire <количество> — нанять воинов\n\n` +
+            `/army — казарма и типы войск\n` +
 
             `👥 РЕФЕРАЛЫ:\n` +
             `/referral — ссылка для друзей\n\n` +
@@ -177,7 +104,10 @@ module.exports = (bot) => {
             `🏪 ТОРГОВЛЯ:\n` +
             `/market — рынок\n` +
             `/sell <ресурс> <кол-во> — продать\n` +
-            `/buy <ресурс> <кол-во> — купить\n\n` +
+            `/buy <ресурс> <кол-во> — купить\n` +
+            `/port — торговые лоты игроков\n` +
+            `/sell_port <ресурс> <кол-во> <цена> <валюта> — выставить лот\n` +
+            `/buy_port <ID> — купить лот\n\n` +
 
             `🎁 ПРОМОКОДЫ:\n` +
             `/promo <код> — активировать промокод\n\n` +
@@ -220,10 +150,20 @@ module.exports = (bot) => {
         if ((user[resource] || 0) < amount) {
             return ctx.reply(`❌ У тебя только ${user[resource] || 0} ${resource}.`);
         }
+        const commission = getMarketCommission(user);
+        const totalPrice = amount * prices[resource];
+        const fee = Math.floor(totalPrice * commission);
+        const earned = totalPrice - fee;
+
         user[resource] -= amount;
-        user.gold += amount * prices[resource];
+        user.gold += earned;
+
         saveUser(ctx.from.id, user);
-        ctx.reply(`✅ Продано ${amount} ${resource} за ${amount * prices[resource]} золота.`);
+
+        ctx.reply(
+            `✅ Продано ${amount} ${resource} за ${earned} золота.\n` +
+            `💸 Комиссия: ${fee} золота`
+        );
     });
 
     // ===== /BUY =====
@@ -781,7 +721,7 @@ module.exports = (bot) => {
                 user.food += amount;
                 break;
             case 'soldiers':
-                user.soldiers += amount;
+                addWarriors(user, amount);
                 break;
             case 'vip':
                 user.vip = {
@@ -828,7 +768,7 @@ module.exports = (bot) => {
                 case 'gold': user.gold += amount; break;
                 case 'coins': user.coins += amount; break;
                 case 'food': user.food += amount; break;
-                case 'soldiers': user.soldiers += amount; break;
+                case 'soldiers': addWarriors(user, amount); break;
             }
             count++;
         }
@@ -963,7 +903,7 @@ module.exports = (bot) => {
                 user.food = 0;
                 user.coins = 0;
                 user.citizens = 5;
-                user.soldiers = 0;
+                user.army = user.army || {}; for (const type of Object.keys(user.army)) user.army[type] = 0; syncSoldierCount(user);
                 user.level = 1;
                 user.dailyStreak = 0;
                 
@@ -1132,7 +1072,6 @@ module.exports = (bot) => {
                 // Старый формат (только users)
                 dbData = {
                     users: backupData.users,
-                    globalBoss: backupData.globalBoss || { hp: 5000, maxHp: 5000, active: false, participants: [] },
                     promocodes: backupData.promocodes || {}
                 };
                 offersData = { offers: [] };
@@ -1141,6 +1080,8 @@ module.exports = (bot) => {
             } else {
                 return ctx.reply('❌ Неизвестный формат бекапа. Ожидается ключ "users" или "database".');
             }
+
+            delete dbData.globalBoss;
 
             const userCount = Object.keys(dbData.users || {}).length;
             const offersCount = offersData.offers ? offersData.offers.length : 0;

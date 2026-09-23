@@ -1,60 +1,95 @@
-const { getUser } = require('./storage');
-const { WEALTH_TAX,TECH_TREE } = require('../config/constants');
+const { WEALTH_TAX, TECH_TREE, INCOME_INTERVALS } = require('../config/constants');
+const { saveUser } = require('../utils/storage');
+const { ARMY_UNITS } = require('../config/army');
 
-// ===== VIP =====
 function isVIP(user) {
-    return user.vip && user.vip.active && user.vip.expiresAt > Date.now();
+    return Boolean(user?.vip?.active && user.vip.expiresAt > Date.now());
 }
 
-// ===== ИНТЕРВАЛ ДОХОДА =====
 function getIncomeInterval(user) {
-    const { INCOME_INTERVALS } = require('../config/constants');
     return isVIP(user) ? INCOME_INTERVALS.vip : INCOME_INTERVALS.regular;
 }
 
-// ===== СОЛДАТЫ =====
+function getArmyCount(user) {
+    return Object.values(user?.army || {})
+        .reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
+}
+
+function syncSoldierCount(user) {
+    if (!user) return 0;
+    user.soldiers = getArmyCount(user);
+    return user.soldiers;
+}
+
+function addWarriors(user, amount) {
+    const count = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!user || count <= 0) return 0;
+    user.army = user.army || {};
+    user.army.warriors = (Number(user.army.warriors) || 0) + count;
+    syncSoldierCount(user);
+    return count;
+}
+
+function removeWarriors(user, amount) {
+    const count = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!user || count <= 0) return 0;
+    user.army = user.army || {};
+    const removed = Math.min(Number(user.army.warriors) || 0, count);
+    user.army.warriors = (Number(user.army.warriors) || 0) - removed;
+    syncSoldierCount(user);
+    return removed;
+}
+
 function getSoldiers(user) {
-    return user.soldiers || 0;
+    return syncSoldierCount(user);
 }
 
-// ===== БОСС HP =====
-function getPersonalBossHP(user) {
-    return 8000 + (user.level - 1) * 1500;
-}
+function getEconomyBonuses(user) {
+    const level = Math.max(0, Number(user?.techTree?.economy) || 0);
+    const result = {
+        incomeMultiplier: 1,
+        coinMultiplier: 1,
+        taxReduction: 0,
+        sellBonus: 1,
+        buildDiscount: 0,
+        marketCommission: 0.15,
+        portSlots: 3,
+        marketBuyDiscount: 0
+    };
 
-// ===== НАГРАДА ЗА БОССА =====
-function getBossReward(user) {
-    const baseReward = 100 + user.level * 20;
-    const soldierBonus = Math.floor((user.soldiers || 0) / 10) * 10;
-    let reward = baseReward + soldierBonus;
-    reward = Math.max(200, Math.min(8000, reward));
-    return reward;
-}
-
-// ============================================================
-// 1️⃣ УБЫВАЮЩАЯ ДОХОДНОСТЬ
-// ============================================================
-
-function getDiminishedIncome(base, count) {
-    if (count === 0) return 0;
-    let total = 0;
-    for (let i = 0; i < count; i++) {
-        total += base * Math.pow(0.98, i);
+    for (let current = 1; current <= level; current++) {
+        const bonus = TECH_TREE.economy.levels[current]?.bonus;
+        if (!bonus) continue;
+        if (bonus.incomeMultiplier) result.incomeMultiplier = bonus.incomeMultiplier;
+        if (bonus.coinMultiplier) result.coinMultiplier = bonus.coinMultiplier;
+        if (bonus.taxReduction) result.taxReduction = Math.max(result.taxReduction, bonus.taxReduction);
+        if (bonus.sellBonus) result.sellBonus = Math.max(result.sellBonus, bonus.sellBonus);
+        if (bonus.buildDiscount) result.buildDiscount = Math.max(result.buildDiscount, bonus.buildDiscount);
+        if (bonus.marketCommission !== undefined) result.marketCommission = bonus.marketCommission;
+        if (bonus.portSlots) result.portSlots = 3 + bonus.portSlots;
+        if (bonus.marketBuyDiscount) result.marketBuyDiscount = Math.max(result.marketBuyDiscount, bonus.marketBuyDiscount);
     }
-    return Math.floor(total);
+
+    return result;
 }
 
-// ============================================================
-// 2️⃣ ПРОГРЕССИВНАЯ ЦЕНА
-// ============================================================
+function getPortLimit(user) {
+    return getEconomyBonuses(user).portSlots;
+}
+
+function getPersonalBossHP(user) {
+    const level = Math.max(1, (Number(user?.bossKills) || 0) + 1);
+    return Math.floor(1000 * Math.pow(1.25, level - 1));
+}
+
+function getBossReward(user) {
+    const bossLevel = Math.max(1, (Number(user?.bossKills) || 0) + 1);
+    return Math.min(8000, Math.max(200, Math.floor(100 + bossLevel * 40 + getSoldiers(user) * 2)));
+}
 
 function getProgressivePrice(basePrice, count) {
-    return Math.floor(basePrice * (1 + count * 0.15));
+    return Math.floor((Number(basePrice) || 0) * (1 + Math.max(0, Number(count) || 0) * 0.15));
 }
-
-// ============================================================
-// 3️⃣ НАЛОГ НА БОГАТСТВО
-// ============================================================
 
 function applyWealthTax(user) {
     if (!user || user.coins <= WEALTH_TAX.threshold) return 0;
@@ -65,102 +100,62 @@ function applyWealthTax(user) {
     return tax;
 }
 
-// ============================================================
-// ЗАЩИТА ОТ ПЕРЕПОЛНЕНИЯ
-// ============================================================
+const MAX_SAFE = 1000000000000000;
 
-const MAX_SAFE = 1000000000000000
-//    Это максимальное значение для любого ресурса.
-
-function clampResources(user){
-    if(!user) return user
-    if(user.gold > MAX_SAFE){
-        user.gold = MAX_SAFE
+function clampResources(user) {
+    if (!user) return user;
+    for (const key of ['gold', 'food', 'coins', 'iron', 'metal']) {
+        if (Number(user[key]) > MAX_SAFE) user[key] = MAX_SAFE;
+        if (Number(user[key]) < 0 || !Number.isFinite(Number(user[key]))) user[key] = 0;
     }
-    if(user.food > MAX_SAFE){
-        user.food = MAX_SAFE
-    }
-    if(user.coins > MAX_SAFE){
-        user.coins = MAX_SAFE
-    }
-    return user
+    return user;
 }
-// ============================================================
-// 4️⃣ РАСЧЁТ ДОХОДА
-// ============================================================
 
-function calculateIncome(user) {
+function calculateIncome(user, options = {}) {
+    const preview = Boolean(options.preview);
     if (!user) {
         return { gold: 0, food: 0, coins: 0, iron: 0, deserters: 0, foodEaten: 0, tax: 0 };
     }
-    clampResources(user);
-    const buildings = user.buildings || {};
-    const citizens = user.citizens || 5;
-    const soldiers = user.soldiers || 0;
-    const ecoLevel = user.techTree?.economy || 0;
 
-    // ===== НУЖНО РАБОЧИХ =====
+    if (!preview) clampResources(user);
+    syncSoldierCount(user);
+
+    const buildings = user.buildings || {};
+    const citizens = Math.max(0, Number(user.citizens) || 0);
+    const soldiers = getSoldiers(user);
+    const economy = getEconomyBonuses(user);
+
     const WORKERS_NEEDED = {
         hut: 0, house: 0, tavern: 1,
         farm: 1, field: 2,
         mine: 2, quarry: 3, iron_mine: 2,
         mint: 1, mint_factory: 2, smelter: 2,
-        market: 1, bank: 1,
-        barracks: 0, forge: 0, walls: 0,
-        acropolis: 0, garden: 1
+        market: 1, bank: 1, barracks: 0,
+        forge: 0, walls: 0, acropolis: 0, garden: 1
     };
 
     let neededWorkers = 0;
-    for (const [key, val] of Object.entries(buildings)) {
-        neededWorkers += (WORKERS_NEEDED[key] || 0) * val;
+    for (const [key, count] of Object.entries(buildings)) {
+        neededWorkers += (WORKERS_NEEDED[key] || 0) * (Number(count) || 0);
     }
 
     const workers = Math.min(citizens, neededWorkers);
     const efficiency = neededWorkers > 0 ? workers / neededWorkers : 1;
 
-    // ===== БАЗОВЫЙ ДОХОД =====
-    let gold = 0;
-    let food = 0;
-    let coins = 0;
-    let iron = 0;
+    let gold = 6 * (buildings.mine || 0) + 200 * (buildings.quarry || 0);
+    let food = 5 * (buildings.farm || 0) + 250 * (buildings.field || 0) + (buildings.tavern || 0);
+    let coins = 6 * (buildings.mint || 0) + 500 * (buildings.mint_factory || 0);
+    let iron = 10 * (buildings.iron_mine || 0) + 50 * (buildings.smelter || 0);
 
-    // Золото
-    gold += getDiminishedIncome(6, buildings.mine || 0);
-    gold += getDiminishedIncome(200, buildings.quarry || 0);
-    gold += (buildings.market || 0) * 10;
-    gold += (buildings.garden || 0) * 5;
-
-    // Еда
-    food += getDiminishedIncome(5, buildings.farm || 0);
-    food += getDiminishedIncome(250, buildings.field || 0);
-    food += (buildings.tavern || 0) * 1;
-
-    // Монеты
-    coins += getDiminishedIncome(6, buildings.mint || 0);
-    coins += getDiminishedIncome(500, buildings.mint_factory || 0);
-
-    // Железо
-    iron += getDiminishedIncome(10, buildings.iron_mine || 0);
-    iron += getDiminishedIncome(50, buildings.smelter || 0);
-
-    // ===== БАНК (бонус к монетам) =====
     if (buildings.bank) {
-        const bankBonus = buildings.bank * 0.05;
-        coins = Math.floor(coins * (1 + bankBonus));
+        coins = Math.floor(coins * (1 + (Number(buildings.bank) || 0) * 0.05));
     }
 
-    // ===== КУЗНИЦА (урон солдатам) =====
-    if (buildings.forge) {
-        user.soldierDamage = (user.soldierDamage || 0) + buildings.forge;
-    }
-
-    // ===== ЭФФЕКТИВНОСТЬ =====
     gold = Math.floor(gold * efficiency);
     food = Math.floor(food * efficiency);
     coins = Math.floor(coins * efficiency);
     iron = Math.floor(iron * efficiency);
 
-    // ===== VIP =====
     if (isVIP(user)) {
         gold = Math.floor(gold * 1.2);
         food = Math.floor(food * 1.2);
@@ -168,7 +163,6 @@ function calculateIncome(user) {
         iron = Math.floor(iron * 1.2);
     }
 
-    // ===== АКРОПОЛЬ =====
     if (user.acropolisBuilt) {
         gold = Math.floor(gold * 1.1);
         food = Math.floor(food * 1.1);
@@ -176,17 +170,11 @@ function calculateIncome(user) {
         iron = Math.floor(iron * 1.1);
     }
 
-    // ===== ВЕТКА ЭКОНОМИКИ =====
-    if (ecoLevel > 0) {
-        const ecoBonus = TECH_TREE.economy.levels[ecoLevel]?.bonus?.incomeMultiplier || 1;
-        const coinBonus = TECH_TREE.economy.levels[ecoLevel]?.bonus?.coinMultiplier || 1;
-        gold = Math.floor(gold * ecoBonus);
-        food = Math.floor(food * ecoBonus);
-        coins = Math.floor(coins * coinBonus);
-        iron = Math.floor(iron * ecoBonus);
-    }
+    gold = Math.floor(gold * economy.incomeMultiplier);
+    food = Math.floor(food * economy.incomeMultiplier);
+    coins = Math.floor(coins * economy.coinMultiplier);
+    iron = Math.floor(iron * economy.incomeMultiplier);
 
-    // ===== ЭКОНОМИЧЕСКОЕ ЧУДО =====
     const now = Date.now();
     if (user.miracleActive && user.miracleExpiresAt && now < user.miracleExpiresAt) {
         gold = Math.floor(gold * 1.3);
@@ -194,18 +182,16 @@ function calculateIncome(user) {
         coins = Math.floor(coins * 1.3);
         iron = Math.floor(iron * 1.3);
     } else if (user.miracleActive && user.miracleExpiresAt && now >= user.miracleExpiresAt) {
-        user.miracleActive = false;
-        user.miracleExpiresAt = 0;
+        if (!preview) {
+            user.miracleActive = false;
+            user.miracleExpiresAt = 0;
+        }
     }
 
-    // ===== ЕДА ДЛЯ ЖИТЕЛЕЙ И СОЛДАТ =====
-    const foodForCitizens = citizens;
-    const foodForSoldiers = soldiers * 0.5;
-    const totalFoodNeeded = foodForCitizens + foodForSoldiers;
-    const foodAfterEat = user.food + food - totalFoodNeeded;
-
+    const totalFoodNeeded = citizens + soldiers * 1.5;
+    const foodAfterEat = (Number(user.food) || 0) + food - totalFoodNeeded;
     let deserters = 0;
-    let finalFood = food;
+    let finalFood;
 
     if (foodAfterEat < 0) {
         const deficit = Math.abs(foodAfterEat);
@@ -213,53 +199,84 @@ function calculateIncome(user) {
         gold = Math.floor(gold * penalty);
         coins = Math.floor(coins * penalty);
         iron = Math.floor(iron * penalty);
-        deserters = Math.floor(deficit / 3) + 1;
-        if (deserters > user.soldiers) deserters = user.soldiers;
-        user.soldiers = Math.max(0, user.soldiers - deserters);
+        deserters = Math.min(soldiers, Math.floor(deficit / 3) + 1);
+        if (deserters > 0 && !preview) {
+            // Дезертируют сначала обычные мечники — это бывшие generic soldiers.
+            removeWarriors(user, deserters);
+        }
         finalFood = 0;
     } else {
         finalFood = Math.floor(foodAfterEat);
     }
 
-    // ===== НАЛОГОВАЯ ЛЬГОТА =====
-    const taxReduction = TECH_TREE.economy.levels[ecoLevel]?.bonus?.taxReduction || 0;
-    user.taxReduction = taxReduction;
-
-    // ===== НАЛОГ =====
-    const tax = applyWealthTax(user);
-    if (tax > 0) {
-        console.log(`💰 Налог: ${tax} монет у пользователя ${user.id}`);
+    if (!preview) {
+        user.taxReduction = economy.taxReduction;
+        user.sellBonus = economy.sellBonus;
+        user.portSlots = economy.portSlots;
     }
-    clampResources(user);
+
+    const tax = preview ? 0 : applyWealthTax(user);
+    if (!preview) clampResources(user);
+
     return {
         gold: Math.floor(gold),
         food: Math.floor(food),
-        foodEaten: Math.floor(totalFoodNeeded), 
+        foodEaten: Math.floor(totalFoodNeeded),
         coins: Math.floor(coins),
         iron: Math.floor(iron),
         deserters,
         tax
     };
 }
+
 async function sendOrEdit(ctx, text, options = {}) {
     if (ctx.callbackQuery) {
-        return ctx.editMessageText(text, options);
+        try {
+            await ctx.editMessageText(text, options);
+        } catch (error) {
+            if (!error.description?.includes('message is not modified')) throw error;
+        }
+        return ctx.answerCbQuery().catch(() => {});
     }
-
     return ctx.reply(text, options);
+}
+
+function getMarketCommission(user) {
+    return getEconomyBonuses(user).marketCommission;
+}
+
+function calculateMarketSellPayout(user, amount, basePrice) {
+    const economy = getEconomyBonuses(user);
+    const gross = Math.floor(Math.max(0, Number(amount) || 0) * Math.max(0, Number(basePrice) || 0) * economy.sellBonus);
+    const fee = Math.floor(gross * economy.marketCommission);
+    return { gross, fee, earned: Math.max(0, gross - fee), sellBonus: economy.sellBonus };
+}
+
+function calculateMarketBuyCost(user, amount, basePrice) {
+    const economy = getEconomyBonuses(user);
+    const base = Math.max(0, Number(amount) || 0) * Math.max(0, Number(basePrice) || 0);
+    return Math.max(1, Math.floor(base * (1 - economy.marketBuyDiscount)));
 }
 
 module.exports = {
     isVIP,
     getIncomeInterval,
     getSoldiers,
+    getArmyCount,
+    syncSoldierCount,
+    addWarriors,
+    removeWarriors,
+    getEconomyBonuses,
+    getPortLimit,
     getPersonalBossHP,
     getBossReward,
-    getDiminishedIncome,
     getProgressivePrice,
     applyWealthTax,
     clampResources,
     calculateIncome,
     sendOrEdit,
+    getMarketCommission,
+    calculateMarketSellPayout,
+    calculateMarketBuyCost,
     MAX_SAFE
 };

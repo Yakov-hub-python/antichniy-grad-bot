@@ -1,17 +1,16 @@
-const {getUser}=require('../utils/storage')
+const {getUser} = require('../utils/storage')
 const { getSoldiers } = require('../utils/helpers');
-const { inlineKeyboard } = require('telegraf/markup');
 
 module.exports = {
     show: async (ctx) => {
         const user = getUser(ctx.from.id);
         const soldiers = getSoldiers(user);
         const text = `🪖 КАЗАРМА\n\n` +
-            `🪖 Солдаты: ${soldiers}\n` + 
-            `💰 Цена: 1 воин = 6 монет\n\n` +
-            `⚔️ Каждый солдат даёт 5 урона боссам.`
+            `🪖 Солдаты: ${soldiers}\n` +
+            `💰 Базовый найм: 1 воин = 100💰 и 20🍖 через систему армии.\n\n` +
+            `⚔️ Состав армии и характеристики смотри в «Тренировка армии».`
         const reply_markup = {
-            inlineKeyboard:[
+            inline_keyboard:[
                 [{ text: 'Нанять воинов', callback_data: 'hire_warriors_1' }],
                 [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
             ]

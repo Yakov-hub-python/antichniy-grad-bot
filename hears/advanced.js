@@ -1,6 +1,7 @@
 const { getUser, saveUser } = require('../utils/storage');
+const { addWarriors, syncSoldierCount } = require('../utils/helpers');
 const { BUILDING_COSTS, BUILDING_NAMES } = require('../config/constants');
-const { getSoldiers } = require('../utils/helpers');
+const { getSoldiers, getMarketCommission } = require('../utils/helpers');
 
 // ============================================================
 // 1️⃣ ПАРСИНГ КОМАНД
@@ -137,9 +138,10 @@ async function handleSell(ctx, user, resource, amount) {
     if ((user[resource] || 0) < amount) {
         return ctx.reply(`❌ У тебя только ${user[resource] || 0} ${resource}`);
     }
-    
+    const commission = getMarketCommission(user);
+    const fee = Math.floor(amount * commission);
     user[resource] -= amount;
-    const earned = amount * price;
+    const earned = amount * price - fee;
     user.gold += earned;
     await saveUser(ctx.from.id, user);
     
@@ -169,7 +171,6 @@ async function handleBuy(ctx, user, resource, amount) {
     if (user.gold < cost) {
         return ctx.reply(`❌ Нужно ${cost}💰, у тебя ${user.gold}💰`);
     }
-    
     user.gold -= cost;
     user[resource] = (user[resource] || 0) + amount;
     await saveUser(ctx.from.id, user);
@@ -208,7 +209,7 @@ async function handleBuild(ctx, user, target) {
     user.buildings[target] += 1;
     
     if (target === 'hut') user.citizens += 3;
-    if (target === 'barracks') user.soldiers += 2;
+    if (target === 'barracks') addWarriors(user, 2);
     
     const totalBuildings = Object.values(user.buildings).reduce((a, b) => a + b, 0);
     user.level = totalBuildings + 1;
@@ -236,7 +237,7 @@ async function handleHire(ctx, user, amount) {
     }
     
     user.coins -= cost;
-    user.soldiers += amount;
+    addWarriors(user, amount);
     await saveUser(ctx.from.id, user);
     
     await ctx.reply(`✅ Нанято ${amount} солдат за ${cost} монет`);
@@ -248,9 +249,9 @@ async function handleAttack(ctx, user, text) {
     const bossActions = require('../actions/bossActions');
     
     if (words.includes('глобального') || words.includes('global')) {
-        return bossActions.attackGlobal(ctx);
+        return ctx.reply('ℹ️ Глобальный босс удалён в версии 1.6.2. Используй «атаковать босса».');
     } else {
-        return bossActions.attackPersonal(ctx);
+        return bossActions.start(ctx);
     }
 }
 

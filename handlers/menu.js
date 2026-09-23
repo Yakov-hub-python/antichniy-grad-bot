@@ -1,15 +1,16 @@
 const { getUser } = require('../utils/storage');
-const { getSoldiers } = require('../utils/helpers');
+const { getIncomeInterval, getSoldiers } = require('../utils/helpers');
+const { getActiveOffers } = require('../utils/portStorage');
 
 function getHeader(user) {
     const gold = user.gold || 0;
     const coins = user.coins || 0;
     const food = user.food || 0;
     const citizens = user.citizens || 0;
-    const soldiers = user.soldiers || 0;
+    const soldiers = getSoldiers(user);
     
     return `🏛️ ГЛАВНАЯ ПЛОЩАДЬ\n` +
-        `💰 ${gold} | 🪙 ${coins} | 🍖 ${food} | 👥 ${citizens} | 🪖 ${soldiers}\n` +
+        `💰 ${gold} | 🪙 ${coins} | 🍖 ${food} | 👥 ${citizens} \n` +
         `─────────────────`;
 }
 
@@ -28,8 +29,9 @@ function getQuestTracker(user) {
 }
 
 async function showMainMenu(ctx) {
+    const offersCount = getActiveOffers(100,0).length;
     const userId = ctx.from.id;
-    const user = getUser(userId); // убрал await, так как getUser синхронный
+    const user = getUser(userId);
 
     let text = getHeader(user);
     text += `\n👇 Выбери действие:`;
@@ -41,15 +43,10 @@ async function showMainMenu(ctx) {
         { text: `🏙️ Город (${totalBuildings})`, callback_data: 'city_show' }
     ]);
 
-    if (user.soldiers > 0) {
-        buttons.push([
-            { text: `⚔️ Босс (🪖${user.soldiers})`, callback_data: 'boss_show' }
-        ]);
-    } else {
-        buttons.push([
-            { text: `⚔️ Босс (найми солдат!)`, callback_data: 'barracks_show' }
-        ]);
-    }
+
+    buttons.push([
+        { text: `⚔️ Босс `, callback_data: 'boss_show' }
+    ]);
 
     buttons.push([
         { text: '🏪 Рынок', callback_data: 'market_show' }
@@ -62,22 +59,16 @@ async function showMainMenu(ctx) {
 
     const lastIncome = user.lastIncome || 0;
     const now = Date.now();
-    const interval = user.vip?.active ? 60 * 1000 : 90 * 1000;
-    const timeLeft = interval - (now - lastIncome);
-    
-    if (timeLeft <= 0) {
-        buttons.push([
-            { text: '💰 Собрать доход ✅', callback_data: 'collect_income' }
-        ]);
-    } else {
-        const seconds = Math.floor(timeLeft / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        const timeText = minutes > 0 ? `${minutes}м ${secs}с` : `${secs}с`;
-        buttons.push([
-            { text: `⏳ Доход через ${timeText}`, callback_data: 'collect_income' }
-        ]);
+    const interval = getIncomeInterval(user);
+    const timeLeft = Math.max(0, interval - (now - lastIncome));
+    let incomeButton = '💰 Собрать доход';
+    if (timeLeft > 0) {
+        const left = Math.ceil(timeLeft / 1000);
+        incomeButton = `⏳ Доход через ${left}с`;
     }
+    buttons.push([
+        { text: incomeButton, callback_data: 'collect_income' }
+    ]);
 
     buttons.push([
         { text: '🪖 Казарма', callback_data: 'barracks_show' }
@@ -88,13 +79,34 @@ async function showMainMenu(ctx) {
         { text: 'ℹ️ О боте', callback_data: 'about_show' }
     ]);
 
+    const textBranch = "📈 Ветки развития"
+    const callback_data_branch =  'branch_show'
+
+    let portText = '📦 Порт';
+
+    if (offersCount > 0) {
+        let wordLot;
+        if (offersCount === 1) {
+            wordLot = 'лот';
+        } else if (offersCount >= 2 && offersCount <= 4) {
+            wordLot = 'лота';
+        } else {
+            wordLot = 'лотов';
+        }
+        portText = `📦 Порт (${offersCount} ${wordLot})`;
+    }
+    buttons.push([
+        { text: portText, callback_data: 'port_show' },
+        { text: '📈 Ветки развития', callback_data: 'branch_show' }
+    ]);
+    buttons.push([
+        { text: '⚔️ Тренировка армии', callback_data: 'training_show' }
+    ]);
     const extra = {
         reply_markup: {
             inline_keyboard: buttons
         }
     };
-
-    // Если вызов через кнопку — редактируем, иначе — новое сообщение
     if (ctx.callbackQuery) {
         try {
             await ctx.editMessageText(text, extra);

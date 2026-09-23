@@ -1,5 +1,7 @@
 const { getUser, saveUser } = require('../utils/storage');
 const { createOffer, getActiveOffers, getOfferById, buyOffer, cancelOffer, cleanExpiredOffers } = require('../utils/portStorage');
+const { getPortLimit } = require('../utils/helpers');
+const { inlineKeyboard } = require('telegraf/markup');
 
 // Автоматическая очистка просроченных лотов при вызове любой команды
 cleanExpiredOffers();
@@ -27,8 +29,54 @@ module.exports = {
             reply += `🆔 ID: <code>${o.id}</code>\n\n`;
         });
         reply += 'Используй /buy_port ID чтобы купить лот.';
-
-        ctx.reply(reply, { parse_mode: 'HTML' });
+        if (ctx.callbackQuery) {
+            try {
+                await ctx.editMessageText(reply,
+                    {
+                        parse_mode: "HTML",
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    {text:"Назад",callback_data:"back_to_menu"}
+                                ]
+                            ]
+                        }
+                    }
+                );
+                await ctx.answerCbQuery();
+            } catch (err) {
+                if (err.description && err.description.includes('message is not modified')) {
+                    await ctx.answerCbQuery();
+                } else {
+                    console.error('❌ Ошибка редактирования главного меню:', err);
+                    await ctx.reply(reply,
+                        {
+                            parse_mode: "HTML",
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [
+                                        {text:"Назад",callback_data:"back_to_menu"}
+                                    ]
+                                ]
+                            }
+                        }
+                    );
+                }
+            }
+        } else {
+            await ctx.reply(reply,
+                {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                {text:"Назад",callback_data:"back_to_menu"}
+                            ]
+                        ]
+                    }
+                }
+            );
+        }
     },
 
     // /sell_port <ресурс> <количество> <цена_за_единицу> <валюта>
@@ -54,8 +102,13 @@ module.exports = {
         if (currency !== 'gold' && currency !== 'coins') {
             return ctx.reply('❌ Валюта должна быть gold или coins');
         }
-        if (amount <= 0 || pricePerUnit <= 0) {
-            return ctx.reply('❌ Количество и цена должны быть положительными числами.');
+        if (
+            !Number.isInteger(amount) ||
+            !Number.isInteger(pricePerUnit) ||
+            amount <= 0 ||
+            pricePerUnit <= 0
+        ) {
+            return ctx.reply('❌ Количество и цена должны быть положительными целыми числами.');
         }
 
         const user = getUser(ctx.from.id);
@@ -65,9 +118,19 @@ module.exports = {
             return ctx.reply('❌ Порт откроется на 3 уровне ветки экономики.');
         }
 
+        const activeSellerOffers = getActiveOffers(1000, 0).filter(o => o.sellerId === ctx.from.id);
+        const portLimit = getPortLimit(user);
+        if (activeSellerOffers.length >= portLimit) {
+            return ctx.reply(`❌ У тебя занято ${activeSellerOffers.length}/${portLimit} слотов порта. Развивай экономику до 14 уровня, чтобы получить ещё +2 слота.`);
+        }
+
         if ((user[resource] || 0) < amount) {
             return ctx.reply(`❌ У тебя только ${user[resource] || 0} ${resource}.`);
         }
+
+        // Ресурс резервируется в момент выставления лота.
+        user[resource] -= amount;
+        saveUser(ctx.from.id, user);
 
         const offer = createOffer(ctx.from.id, resource, amount, pricePerUnit, currency);
 
@@ -111,16 +174,12 @@ module.exports = {
             return ctx.reply('❌ Продавец не найден. Возможно, он удалил аккаунт.');
         }
 
-        if ((seller[offer.resource] || 0) < offer.amount) {
-            cancelOffer(offerId, offer.sellerId);
-            return ctx.reply('❌ У продавца больше нет этого ресурса. Лот отменён.');
-        }
-
-        // Транзакция
+        // Ресурс уже был зарезервирован при создании лота.
+        // Поэтому повторно проверять/списывать его у продавца не нужно.
         buyer[currency] -= offer.totalPrice;
         buyer[offer.resource] = (buyer[offer.resource] || 0) + offer.amount;
 
-        seller[offer.resource] -= offer.amount;
+        // Продавец получает валюту за зарезервированный ресурс.
         seller[currency] = (seller[currency] || 0) + offer.totalPrice;
 
         const db = require('../utils/portStorage');

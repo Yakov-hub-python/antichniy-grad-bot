@@ -55,17 +55,19 @@ async function sellResource(ctx, resource) {
     }
 
     // ===== КОМИССИЯ =====
-    const ecoLevel = user.techTree?.economy || 0;
-    const commissionRate = MARKET_COMMISSION[ecoLevel] || 0.15;
-    const basePrice = amount * price;
-    const commission = Math.floor(basePrice * commissionRate);
-    const earned = basePrice - commission;
+    const commission = getMarketCommission(user);
+    const totalPrice = amount * price;
+    const fee = Math.floor(totalPrice * commission);
+    const earned = totalPrice - fee;
 
     user[resource] -= amount;
     user.gold += earned;
     saveUser(ctx.from.id, user);
 
-    await ctx.answerCbQuery(`✅ Продано ${amount} ${resource} за ${earned}💰 (комиссия: ${commission})`);
+    await ctx.answerCbQuery(
+        `✅ Продано ${amount} ${resource} за ${earned}💰`
+    );
+
     await showMarketMenu(ctx);
 }
 

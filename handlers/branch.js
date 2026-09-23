@@ -1,106 +1,111 @@
 const { getUser, saveUser } = require('../utils/storage');
 const { TECH_TREE } = require('../config/constants');
+const {sendOrEdit} = require('../utils/helpers');
 
 module.exports = async (ctx) => {
-    const args = ctx.message.text.split(' ');
-    if (args.length < 2) {
-        const user = getUser(ctx.from.id);
-        if (!user) return ctx.reply('Сначала /start');
-        const level = user.techTree?.economy || 0;
-        let reply = `🏛️ ВЕТКА ЭКОНОМИКИ\nУровень: ${level}/15\n\n`;
-        if (level < 15) {
-            const next = TECH_TREE.economy.levels[level + 1];
-            reply += `📌 Следующий уровень (${level + 1}):\n💰 ${next.cost.gold} золота, 🪙 ${next.cost.coins} монет\n⏳ ${next.cooldown/3600000} ч. ожидания\n🔓 Открывает: ${next.unlocks.join(', ')}\n\nИспользуй /branch economy, чтобы улучшить.`;
-        } else {
-            reply += '🎉 Максимальный уровень достигнут!';
-        }
-        const reply_markup = {
-            inline_keyboard: [
-                [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-            ]
-        };
-        if (ctx.callbackQuery) {
-            await ctx.editMessageText(reply, { reply_markup });
-            await ctx.answerCbQuery();
-        } else {
-            await ctx.reply(reply, { reply_markup });
-        }
-        return;
-    }
-
-    const branchName = args[1];
-    if (branchName !== 'economy') {
-        return ctx.reply('❌ Доступна только ветка economy.');
-    }
-
+    const args = ctx.message?.text?.split(' ') || [];
     const user = getUser(ctx.from.id);
     if (!user) return ctx.reply('Сначала /start');
-    if (user.techTree?.economy >= 15) {
-        return ctx.reply('🎉 Ветка экономики уже максимальна!');
+
+    // ===== ВЕТКА 1: показать список =====
+    if (args.length < 2) {
+        let reply = '🏛️ ВЕТКИ РАЗВИТИЯ\n\n';
+        for (const [key, branch] of Object.entries(TECH_TREE)) {
+            const level = user.techTree?.[key] || 0;
+            const maxLevel = Object.keys(branch.levels).length;
+            reply += `${branch.name} — уровень ${level}/${maxLevel}\n`;
+        }
+        reply += '\nИспользуй /branch <economy|army> для улучшения.';
+        return sendOrEdit(ctx,reply,{
+            reply_markup:{
+                inline_keyboard: [
+                    [
+                        {text:"Назад",callback_data:"back_to_menu"}
+                    ]
+                ]
+            }
+        });
     }
 
-    const nextLevel = (user.techTree?.economy || 0) + 1;
-    const levelData = TECH_TREE.economy.levels[nextLevel];
-    if (!levelData) {
-        return ctx.reply('❌ Ошибка: данные уровня не найдены.');
+    // ===== ВЕТКА 2: улучшить =====
+    const nameTree = args[1].toLowerCase();
+    const tree = TECH_TREE[nameTree];
+    if (!tree) return ctx.reply('❌ Доступно: economy, army.');
+
+    const currentLevel = user.techTree?.[nameTree] || 0;
+    const maxLevel = Object.keys(tree.levels).length;
+
+    if (currentLevel >= maxLevel) {
+        return ctx.reply('🎉 Эта ветка прокачена на максимум');
     }
 
-    // Проверка уровня города
+    const nextLevel = currentLevel + 1;
+    const levelData = tree.levels[nextLevel];
+
+    // --- Проверка уровня города ---
     if ((user.level || 1) < levelData.requirements.level) {
-        return ctx.reply(`❌ Требуется уровень города ${levelData.requirements.level}. У тебя ${user.level || 1}.`);
+        return ctx.reply(`❌ Нужен уровень города ${levelData.requirements.level}`);
     }
 
-    // Кулдаун
+    // --- Проверка кулдауна ---
     const now = Date.now();
-    const lastUpgrade = user.techTreeLastUpgrade?.economy || 0;
+    const lastUpgrade = user.techTreeLastUpgrade?.[nameTree] || 0;
     if (now - lastUpgrade < levelData.cooldown) {
         const left = Math.ceil((levelData.cooldown - (now - lastUpgrade)) / 3600000);
-        return ctx.reply(`⏳ Подожди ${left} ч. до следующего улучшения.`);
+        return ctx.reply(`⏳ Подожди ${left} ч.`);
     }
 
-    // Ресурсы
-    const { gold, coins } = levelData.cost;
-    if (user.gold < gold) {
-        return ctx.reply(`❌ Нужно ${gold}💰, у тебя ${user.gold}.`);
+    // --- Проверка ресурсов ---
+    if (user.gold < levelData.cost.gold) {
+        return ctx.reply(`❌ Нужно ${levelData.cost.gold}💰`);
     }
-    if (user.coins < coins) {
-        return ctx.reply(`❌ Нужно ${coins}🪙, у тебя ${user.coins}.`);
+    if (user.coins < levelData.cost.coins) {
+        return ctx.reply(`❌ Нужно ${levelData.cost.coins}🪙`);
     }
 
-    // Списываем
-    user.gold -= gold;
-    user.coins -= coins;
+    // --- Действия ---
+    user.gold -= levelData.cost.gold;
+    user.coins -= levelData.cost.coins;
+
     user.techTree = user.techTree || {};
-    user.techTree.economy = nextLevel;
+    user.techTree[nameTree] = nextLevel;
+
     user.techTreeLastUpgrade = user.techTreeLastUpgrade || {};
-    user.techTreeLastUpgrade.economy = now;
+    user.techTreeLastUpgrade[nameTree] = now;
+
+    // --- Бонусы армии ---
+    if (nameTree === 'army') {
+        if (levelData.bonus.damageBonus) {
+            user.soldierDamage = (user.soldierDamage || 0) + levelData.bonus.damageBonus;
+        }
+        if (levelData.bonus.defenseBonus) {
+            user.soldierDefense = (user.soldierDefense || 0) + levelData.bonus.defenseBonus;
+        }
+    }
+    // --- Бонусы экономики ---
+    if (nameTree === 'economy') {
+        if (levelData.bonus?.taxReduction) {
+            user.taxReduction =
+                Math.max(
+                    user.taxReduction || 0,
+                    levelData.bonus.taxReduction
+                );
+        }
+
+        if (levelData.bonus?.sellBonus) {
+            user.sellBonus =
+                Math.max(
+                    user.sellBonus || 1,
+                    levelData.bonus.sellBonus
+                );
+        }
+    }
     saveUser(ctx.from.id, user);
 
-    let reply = `✅ Экономика улучшена до ${nextLevel} уровня!\n`;
-    if (levelData.unlocks) {
-        reply += `🔓 Открыто: ${levelData.unlocks.join(', ')}\n`;
-    }
-    if (levelData.bonus) {
-        // Используем описание бонуса из techTree
-        const bonusDescription = levelData.bonus.description || '';
-        if (bonusDescription) {
-            reply += `📈 Бонус: ${bonusDescription}\n`;
-        }
-        if (levelData.bonus.activeAbility) {
-            reply += `✨ Активная способность: ${levelData.bonus.activeAbility}\n`;
-        }
-    }
+    // --- Ответ ---
+    let reply = `✅ ${tree.name} улучшена до ${nextLevel} уровня!\n`;
+    if (levelData.unlocks) reply += `🔓 Открыто: ${levelData.unlocks.join(', ')}\n`;
+    if (levelData.bonus?.description) reply += `📈 Бонус: ${levelData.bonus.description}`;
 
-    const reply_markup = {
-        inline_keyboard: [
-            [{ text: '🔙 Назад', callback_data: 'back_to_menu' }]
-        ]
-    };
-
-    if (ctx.callbackQuery) {
-        await ctx.editMessageText(reply, { reply_markup });
-        await ctx.answerCbQuery();
-    } else {
-        await ctx.reply(reply, { reply_markup });
-    }
+    sendOrEdit(ctx,reply);
 };

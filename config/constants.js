@@ -130,8 +130,8 @@ const MAX_SOLDIERS = 10000;
 // ============================================================
 
 const INCOME_INTERVALS = {
-    regular: 90 * 1000,  // 1.5 минуты
-    vip: 60 * 1000,      // 1 минута
+    regular: 20 * 1000,  // 20 секунд
+    vip: 15 * 1000,      // 15 секунд
 };
 
 // ============================================================
@@ -147,21 +147,30 @@ const TECH_TREE = {
                 requirements: { level: 5 },
                 cooldown: 1 * 60 * 60 * 1000,
                 unlocks: ['Рынок'],
-                bonus: { incomeMultiplier: 1.00, description: 'Открывает рынок' }
+                bonus: {
+                    incomeMultiplier: 1.00,
+                    description: 'Открывает рынок'
+                }
             },
             2: {
                 cost: { gold: 1000, coins: 20 },
                 requirements: { level: 10 },
                 cooldown: 2 * 60 * 60 * 1000,
                 unlocks: ['Банк'],
-                bonus: { incomeMultiplier: 1.05, description: 'Множитель дохода +5%' }
+                bonus: {
+                    incomeMultiplier: 1.05,
+                    description: 'Множитель дохода +5%'
+                }
             },
             3: {
                 cost: { gold: 2000, coins: 50 },
                 requirements: { level: 15 },
                 cooldown: 3 * 60 * 60 * 1000,
                 unlocks: ['Порт'],
-                bonus: { incomeMultiplier: 1.10, description: 'Множитель дохода +10%' }
+                bonus: {
+                    incomeMultiplier: 1.10,
+                    description: 'Множитель дохода +10%'
+                }
             },
             4: {
                 cost: { gold: 3500, coins: 100 },
@@ -189,7 +198,7 @@ const TECH_TREE = {
                 requirements: { level: 35 },
                 cooldown: 10 * 60 * 60 * 1000,
                 unlocks: ['Снижение комиссии рынка'],
-                bonus: { incomeMultiplier: 1.20, description: 'Множитель дохода +20%' }
+                bonus: { incomeMultiplier: 1.20, marketCommission: 0.07, description: 'Итоговый множитель дохода 1.20× + комиссия рынка 7%' }
             },
             8: {
                 cost: { gold: 20000, coins: 1200 },
@@ -217,7 +226,7 @@ const TECH_TREE = {
                 requirements: { level: 55 },
                 cooldown: 24 * 60 * 60 * 1000,
                 unlocks: ['Снижение комиссии рынка до 5%'],
-                bonus: { incomeMultiplier: 1.35, description: 'Множитель дохода +35%' }
+                bonus: { incomeMultiplier: 1.35, marketCommission: 0.05, description: 'Итоговый множитель дохода 1.35× + комиссия рынка 5%' }
             },
             12: {
                 cost: { gold: 160000, coins: 10000 },
@@ -231,25 +240,121 @@ const TECH_TREE = {
                 requirements: { level: 65 },
                 cooldown: 32 * 60 * 60 * 1000,
                 unlocks: ['Снижение стоимости строительства'],
-                bonus: { buildDiscount: 0.10, description: 'Строительство -10%' }
+                bonus: { buildDiscount: 0.10, description: 'Скидка на строительство 10%' }
             },
             14: {
                 cost: { gold: 400000, coins: 25000 },
                 requirements: { level: 70 },
                 cooldown: 36 * 60 * 60 * 1000,
                 unlocks: ['+2 слота в порту'],
-                bonus: { incomeMultiplier: 1.45, description: 'Множитель дохода +45%' }
+                bonus: { incomeMultiplier: 1.45, portSlots: 2, description: 'Итоговый множитель дохода 1.45× +2 слота порта' }
             },
             15: {
                 cost: { gold: 600000, coins: 40000 },
                 requirements: { level: 75 },
                 cooldown: 40 * 60 * 60 * 1000,
                 unlocks: ['Мировой рынок'],
-                bonus: { incomeMultiplier: 1.50, description: 'Множитель дохода +50%' }
+                bonus: { incomeMultiplier: 1.50, marketBuyDiscount: 0.10, description: 'Итоговый множитель дохода 1.50× +10% скидка на покупку ресурсов на рынке' }
             }
         }
-    }
+    },
+    army: {
+        name: '⚔️ Армия',
+        description: 'Путь воина — урон, защита, новые юниты.',
+        levels: {
+            // УРОВЕНЬ 1
+            1: {
+                cost: { gold: 300, coins: 20 },
+                requirements: { level: 3 },
+                cooldown: 1 * 60 * 60 * 1000,
+                unlocks: ['Мечники'],
+                bonus: { damageBonus: 2, description: 'Урон +2' }
+            },
+
+            // УРОВЕНЬ 2
+            2: {
+                cost: { gold: 600, coins: 50 },
+                requirements: { level: 6 },
+                cooldown: 2 * 60 * 60 * 1000,
+                unlocks: ['Копейщики'],
+                bonus: { defenseBonus: 3, description: 'Защита +3' }
+            },
+
+            // УРОВЕНЬ 3
+            3: {
+                cost: { gold: 1200, coins: 100 },
+                requirements: { level: 10 },
+                cooldown: 3 * 60 * 60 * 1000,
+                unlocks: ['Лучники'],
+                bonus: { damageBonus: 5, description: 'Урон +5' }
+            },
+
+            // УРОВЕНЬ 4
+            4: {
+                cost: { gold: 2400, coins: 200 },
+                requirements: { level: 15 },
+                cooldown: 4 * 60 * 60 * 1000,
+                unlocks: ['Доспехи'],
+                bonus: { lossReduction: 0.10, description: 'Потери -10%' }
+            },
+
+            // УРОВЕНЬ 5
+            5: {
+                cost: { gold: 4800, coins: 400 },
+                requirements: { level: 20 },
+                cooldown: 6 * 60 * 60 * 1000,
+                unlocks: ['Рыцари'],
+                bonus: { damageBonus: 10, description: 'Урон +10' }
+            },
+
+            // УРОВЕНЬ 6
+            6: {
+                cost: { gold: 8000, coins: 800 },
+                requirements: { level: 25 },
+                cooldown: 8 * 60 * 60 * 1000,
+                unlocks: ['Осадные орудия'],
+                bonus: { bossDamage: 15, description: 'Урон по боссу +15' }
+            },
+
+            // УРОВЕНЬ 7
+            7: {
+                cost: { gold: 15000, coins: 1500 },
+                requirements: { level: 30 },
+                cooldown: 10 * 60 * 60 * 1000,
+                unlocks: ['Катапульты'],
+                bonus: { damageBonus: 20, description: 'Урон +20' }
+            },
+
+            // УРОВЕНЬ 8
+            8: {
+                cost: { gold: 25000, coins: 2500 },
+                requirements: { level: 35 },
+                cooldown: 12 * 60 * 60 * 1000,
+                unlocks: ['Генерал'],
+                bonus: { damageBonus: 25, description: 'Урон +25' }
+            },
+
+            // УРОВЕНЬ 9
+            9: {
+                cost: { gold: 40000, coins: 4000 },
+                requirements: { level: 40 },
+                cooldown: 16 * 60 * 60 * 1000,
+                unlocks: ['Легион'],
+                bonus: { damageBonus: 30, description: 'Урон +30' }
+            },
+
+            // УРОВЕНЬ 10
+            10: {
+                cost: { gold: 60000, coins: 6000 },
+                requirements: { level: 45 },
+                cooldown: 20 * 60 * 60 * 1000,
+                unlocks: ['Бессмертные'],
+                bonus: { damageBonus: 50, defenseBonus: 20, description: 'Урон +50, защита +20' }
+            }
+        }
+    },
 };
+
 
 // ============================================================
 // 9️⃣ НАЛОГ НА БОГАТСТВО

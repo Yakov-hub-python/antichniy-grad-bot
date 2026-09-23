@@ -1,30 +1,17 @@
 const cron = require('node-cron');
 const fs = require('fs');
 const { readDB, writeDB } = require('../utils/storage');
+const { cleanExpiredOffers } = require('../utils/portStorage');
 
-// ===== ГЛОБАЛЬНЫЙ БОСС =====
-function scheduleGlobalBoss() {
-    cron.schedule('0 0,6,12,18 * * *', () => {
+// ===== ОЧИСТКА ПРОСРОЧЕННЫХ ЛОТОВ =====
+function schedulePortCleanup() {
+    setInterval(() => {
         try {
-            const db = readDB();
-            if (db.globalBoss?.active) {
-                console.log('⚠️ Босс уже активен');
-                return;
-            }
-            const userCount = Object.keys(db.users || {}).length;
-            const hp = 1000 * Math.floor(userCount / 2) || 5000;
-            db.globalBoss = {
-                hp,
-                maxHp: hp,
-                active: true,
-                participants: []
-            };
-            writeDB(db);
-            console.log(`🌍 Глобальный босс создан! HP: ${hp}`);
+            cleanExpiredOffers();
         } catch (err) {
-            console.error('❌ Ошибка создания босса:', err.message);
+            console.error('❌ Очистка порта:', err.message);
         }
-    }, { timezone: "Europe/Moscow" });
+    }, 60 * 1000);
 }
 
 // ===== VIP ОЧИСТКА =====
@@ -73,7 +60,7 @@ function scheduleBackup(bot) {
 // ===== ЗАПУСК ВСЕХ ЗАДАЧ =====
 function startCron(bot) {
     console.log('⏰ Запуск cron-задач...');
-    scheduleGlobalBoss();
+    schedulePortCleanup();
     scheduleVIPCleanup();
     scheduleBackup(bot);
     console.log('✅ Cron-задачи запущены');

@@ -3,7 +3,7 @@ const { MAIN_MENU } = require('../config/constants');
 const { showMainMenu } = require('../handlers/menu');
 const { updateQuestProgress } = require('../utils/quests');
 const { checkAchievements, claimAchievementReward } = require('../utils/achievements');
-const { startTraining, getFirstStep } = require('../utils/training');
+const { startTutorial } = require('./tutorial')
 
 module.exports = async (ctx) => {
     const userId = ctx.from.id;
@@ -88,20 +88,8 @@ module.exports = async (ctx) => {
     }
 
 
-    if (!user.training) {
-        startTraining(user);
-        const step = getFirstStep();
-        
-        await ctx.reply(
-            `🏛️ ДОБРО ПОЖАЛОВАТЬ, ${ctx.from.first_name.toUpperCase()}!\n\n` +
-            `📚 ОБУЧЕНИЕ: ШАГ 1 / 4\n\n` +
-            `${step.title}\n${step.description}\n\n` +
-            `🏆 Награда: ${step.reward}💰\n\n` +
-            `💰 Золото: ${user.gold}\n` +
-            `🏗️ Уровень: ${user.level}\n` +
-            `👥 Друзей: ${user.referrals?.length || 0}`
-        );
-        saveUser(userId, user);
+    if (!user.tutorialComplete) {
+        await startTutorial(ctx);
         return;
     }
     // ===== ПРИВЕТСТВИЕ =====

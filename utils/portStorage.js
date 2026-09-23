@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const { getUser, saveUser } = require('./storage');
+const { clampResources } = require('./helpers');
 const OFFERS_FILE = path.join(__dirname, '../offers.json');
 
 function readOffers() {
@@ -52,13 +54,21 @@ function cleanExpiredOffers() {
     const db = readOffers();
     const now = Date.now();
     let changed = false;
-    db.offers = db.offers.map(o => {
-        if (o.status === 'active' && o.expiresAt < now) {
-            o.status = 'expired';
-            changed = true;
+
+    db.offers = db.offers.filter(offer => {
+        if (offer.status !== 'active' || offer.expiresAt >= now) return true;
+
+        const seller = getUser(offer.sellerId);
+        if (seller) {
+            seller[offer.resource] = (Number(seller[offer.resource]) || 0) + offer.amount;
+            clampResources(seller);
+            saveUser(offer.sellerId, seller);
         }
-        return o;
+
+        changed = true;
+        return false;
     });
+
     if (changed) writeOffers(db);
 }
 module.exports = { readOffers, writeOffers, createOffer, getActiveOffers, getOfferById, buyOffer, cancelOffer,cleanExpiredOffers };
