@@ -440,59 +440,40 @@ module.exports = (bot) => {
     // 8️⃣ НАЙМ СОЛДАТ
     // ============================================================
 
-    bot.hears(/нанять (\d+)/, async (ctx) => {
-        const match = ctx.message.text.match(/нанять (\d+)/);
-        const amount = parseInt(match[1]);
-        const user = await getUser(ctx.from.id);
-
-        const MAX_SOLDIERS = 10000;
-        if (user.soldiers + amount > MAX_SOLDIERS) {
-            return ctx.reply(`❌ Нельзя нанять больше ${MAX_SOLDIERS} солдат. У тебя уже ${user.soldiers}.`);
+    bot.hears(/^нанять\s+(.+?)\s+(\d+)$/i, async (ctx) => {
+        const match = ctx.message.text.match(/^нанять\s+(.+?)\s+(\d+)$/i);
+        const typeNames = {
+            'мечник': 'warriors', 'мечники': 'warriors', 'мечников': 'warriors',
+            'копейщик': 'spearmen', 'копейщики': 'spearmen', 'копейщиков': 'spearmen',
+            'лучник': 'archers', 'лучники': 'archers', 'лучников': 'archers',
+            'рыцарь': 'knights', 'рыцари': 'knights', 'рыцарей': 'knights',
+            'осадное орудие': 'siege', 'осадные орудия': 'siege', 'осадных орудий': 'siege',
+            'катапульта': 'catapults', 'катапульты': 'catapults', 'катапульт': 'catapults',
+            'легион': 'legion', 'легионер': 'legion', 'легионеры': 'legion', 'легионеров': 'legion',
+            'бессмертный': 'immortals', 'бессмертные': 'immortals', 'бессмертных': 'immortals'
+        };
+        const typeName = match[1].trim().toLowerCase().replace(/\s+/g, ' ');
+        const type = typeNames[typeName];
+        if (!type) {
+            return ctx.reply('❌ Неизвестный тип. Используй русское название войск, например: нанять мечников 10.');
         }
 
-        const cost = calculateMarketBuyCost(user, amount, 6);
-        const ingotCost = amount * 1;
-
-        if (user.coins < cost) {
-            return ctx.reply(`❌ Нужно ${cost} монет, у тебя ${user.coins}`);
-        }
-        if (user.ingot < ingotCost) {
-            return ctx.reply(`❌ Нужно ${ingotCost} слитков, у тебя ${user.ingot || 0}`);
+        const amount = Number(match[2]);
+        if (!Number.isSafeInteger(amount) || amount <= 0) {
+            return ctx.reply('❌ Количество должно быть целым положительным числом.');
         }
 
-        user.coins -= cost;
-        user.ingot -= ingotCost;
-        addWarriors(user, amount);
-        await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Нанято ${amount} солдат за ${cost} монет и ${ingotCost} слитков`);
-    });
-
-    bot.hears(/нанять все/, async (ctx) => {
-        const user = await getUser(ctx.from.id);
-        const maxByCoins = Math.floor(user.coins / 6);
-        const maxByIngot = user.ingot || 0;
-        const amount = Math.min(maxByCoins, maxByIngot);
-
-        if (amount === 0) {
-            return ctx.reply('❌ Не хватает монет или слитков для найма хотя бы одного солдата');
+        const { getArmyToType } = require('../config/army');
+        const { hireArmy, checkUnlockedToPlayer } = require('../service/armyService');
+        const unit = getArmyToType(type);
+        const user = getUser(ctx.from.id);
+        if (!checkUnlockedToPlayer(user, type)) {
+            return ctx.reply(`❌ ${unit.name} открываются на ${unit.unlockLevel} уровне армии.`);
         }
-
-        const MAX_SOLDIERS = 10000;
-        const maxCanHire = MAX_SOLDIERS - user.soldiers;
-        const finalAmount = Math.min(amount, maxCanHire);
-
-        if (finalAmount <= 0) {
-            return ctx.reply(`❌ У тебя уже ${user.soldiers} солдат. Максимум ${MAX_SOLDIERS}.`);
+        if (!hireArmy(user, type, amount)) {
+            return ctx.reply('❌ Не удалось нанять войска. Проверь ресурсы и лимит 1000 юнитов одного типа.');
         }
-
-        const cost = finalAmount * 6;
-        const ingotCost = finalAmount * 1;
-
-        user.coins -= cost;
-        user.ingot -= ingotCost;
-        addWarriors(user, finalAmount);
-        await saveUser(ctx.from.id, user);
-        await ctx.reply(`✅ Нанято ${finalAmount} солдат за ${cost} монет и ${ingotCost} слитков`);
+        return ctx.reply(`✅ Нанято: ${amount} — ${unit.name}.`);
     });
 
     // ============================================================

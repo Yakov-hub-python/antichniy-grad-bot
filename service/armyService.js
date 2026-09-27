@@ -21,17 +21,18 @@ function getCountTypeArmyToPlayer(user) {
 }
 
 function hireArmy(user, type, amount) {
-    if (!user || !type || !Number.isInteger(amount) || amount <= 0) return false;
+    if (!user || !type || !Number.isSafeInteger(amount) || amount <= 0) return false;
     const unit = getArmyToType(type);
     if (!unit || !checkUnlockedToPlayer(user, type)) return false;
 
     user.army = user.army || {};
-    user.army[type] = Number(user.army[type]) || 0;
+    const currentCount = Number(user.army[type]) || 0;
+    if (!Number.isSafeInteger(currentCount) || currentCount < 0 || currentCount + amount > 1000) return false;
+    user.army[type] = currentCount;
 
     const cost = unit.cost || {};
     if ((user.gold || 0) < (cost.gold || 0) * amount) return false;
     if ((user.food || 0) < (cost.food || 0) * amount) return false;
-    if (user.army[type] + amount > 1000) return false;
 
     user.gold -= (cost.gold || 0) * amount;
     user.food -= (cost.food || 0) * amount;

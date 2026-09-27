@@ -71,10 +71,6 @@ async function showMainMenu(ctx) {
     ]);
 
     buttons.push([
-        { text: '🪖 Казарма', callback_data: 'barracks_show' }
-    ]);
-
-    buttons.push([
         { text: '🏆 Олимп', callback_data: 'olymp_show' },
         { text: 'ℹ️ О боте', callback_data: 'about_show' }
     ]);

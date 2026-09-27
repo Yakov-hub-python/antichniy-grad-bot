@@ -80,9 +80,6 @@ module.exports = (bot) => {
         await ctx.answerCbQuery();
         await require('../hears/about').show(ctx);
     });
-    bot.action('barracks_show', async (ctx) => {
-        await require('../hears/barracks').show(ctx);
-    });
 
     bot.action('olymp_show', async (ctx) => {
         await ctx.answerCbQuery();
@@ -114,9 +111,6 @@ module.exports = (bot) => {
         await sendOrEdit(ctx, '✅ Войско успешно нанято!', { reply_markup: { inline_keyboard: buttons } });
     });
     // ===== ОБУЧЕНИЕ =====
-
-
-
     bot.action('tutorial_next', tutorial.nextStep);
     bot.action('tutorial_skip', tutorial.skipTutorial);
     bot.action('tutorial_finish', tutorial.finishTutorial);

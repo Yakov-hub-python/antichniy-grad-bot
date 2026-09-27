@@ -75,7 +75,43 @@ module.exports = (bot) => {
     bot.command('army', async (ctx) => {
         require('./trainingArmy').show(ctx)
     });
+    bot.command('hire', async (ctx) => {
+        const args = (ctx.message?.text || '').trim().split(/\s+/);
+        if (args.length !== 3) {
+            return ctx.reply('Используй: /hire <тип> <количество>\nПример: /hire warriors 10');
+        }
 
+        const type = args[1].toLowerCase();
+        if (!/^[a-z]+$/.test(type)) {
+            return ctx.reply('❌ Укажи тип войск латиницей, например warriors.');
+        }
+
+        if (!/^\d+$/.test(args[2])) {
+            return ctx.reply('❌ Количество должно быть целым положительным числом.');
+        }
+        const amount = Number(args[2]);
+        if (!Number.isSafeInteger(amount) || amount <= 0) {
+            return ctx.reply('❌ Количество должно быть целым положительным числом.');
+        }
+
+        const { getArmyToType } = require('../config/army');
+        const { hireArmy, checkUnlockedToPlayer } = require('../service/armyService');
+        const unit = getArmyToType(type);
+        if (!unit) {
+            return ctx.reply('❌ Неизвестный тип войск. Посмотри доступные типы командой /army.');
+        }
+
+        const user = getUser(ctx.from.id);
+        if (!checkUnlockedToPlayer(user, type)) {
+            return ctx.reply(`❌ ${unit.name} открываются на ${unit.unlockLevel} уровне армии.`);
+        }
+
+        if (!hireArmy(user, type, amount)) {
+            return ctx.reply('❌ Не удалось нанять войска. Проверь ресурсы и лимит 1000 юнитов одного типа.');
+        }
+
+        return ctx.reply(`✅ Нанято: ${amount} — ${unit.name}.`);
+    })
     // ===== /HELP =====
     bot.command('help', async (ctx) => {
         await ctx.reply(
